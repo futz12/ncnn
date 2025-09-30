@@ -776,6 +776,7 @@ NCNN_EXPORT void cast_float32_to_bfloat16(const Mat& src, Mat& dst, const Option
 NCNN_EXPORT void cast_bfloat16_to_float32(const Mat& src, Mat& dst, const Option& opt = Option());
 NCNN_EXPORT void quantize_to_int8(const Mat& src, Mat& dst, const Mat& scale_data, const Option& opt = Option());
 NCNN_EXPORT void dequantize_from_int32(const Mat& src, Mat& dst, const Mat& scale_data, const Mat& bias_data, const Option& opt = Option());
+NCNN_EXPORT void dequantize_from_int8(const Mat& src, Mat& dst, const Mat& scale_data, const Mat& bias_data, const Option& opt = Option());
 NCNN_EXPORT void requantize_from_int32_to_int8(const Mat& src, Mat& dst, const Mat& scale_in_data, const Mat& scale_out_data, const Mat& bias_data, int activation_type, const Mat& activation_params, const Option& opt = Option());
 
 NCNN_FORCEINLINE Mat::Mat()

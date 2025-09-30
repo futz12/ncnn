@@ -219,6 +219,14 @@ static void dequantize(const int* intptr, float* ptr, const Mat& scale_data, con
 
 int Dequantize_x86::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    if (dequantize_type != 0)
+    {
+        Mat bottom_blob_unpacked;
+        convert_packing(bottom_blob, bottom_blob_unpacked, 1, opt);
+        // dequantize_type only support 0=int32
+        return Dequantize::forward(bottom_blob_unpacked, top_blob, opt);
+    }
+
     const int dims = bottom_blob.dims;
     const int w = bottom_blob.w;
     const int h = bottom_blob.h;

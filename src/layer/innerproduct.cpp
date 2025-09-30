@@ -53,8 +53,24 @@ int InnerProduct::load_model(const ModelBin& mb)
 #if NCNN_INT8
     if (int8_scale_term)
     {
-        weight_data_int8_scales = mb.load(num_output, 1);
-        bottom_blob_int8_scales = mb.load(1, 1);
+        if (int8_scale_term < 1000)
+        {
+            weight_data_int8_scales = mb.load(num_output, 1);
+            bottom_blob_int8_scales = mb.load(1, 1);
+        } else // weight quantize only
+        {
+            ncnn::Mat _weight_data_int8_scales = mb.load(num_output, 1);
+            ncnn::Mat _float_weight_data;
+            Option opt_q;
+            opt_q.num_threads = 1;
+            opt_q.use_packing_layout = false;
+
+            dequantize_from_int8(weight_data,_float_weight_data, _weight_data_int8_scales,0, opt_q);
+
+            weight_data = _float_weight_data;
+
+            int8_scale_term = 0; // dequantize weight, there is no difference with float model
+        }
     }
 #endif // NCNN_INT8
 

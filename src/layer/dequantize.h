@@ -22,6 +22,7 @@ public:
 public:
     int scale_data_size;
     int bias_data_size;
+    int dequantize_type; // 0=from int32, 1=from int8
 
     Mat scale_data;
     Mat bias_data;

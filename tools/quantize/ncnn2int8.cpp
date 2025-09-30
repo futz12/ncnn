@@ -116,7 +116,7 @@ public:
 public:
     int quantize_convolution();
     int quantize_convolutiondepthwise();
-    int quantize_innerproduct();
+    int quantize_innerproduct(bool weight_only = false);
 
     int quantize_rnn();
     int quantize_lstm();
@@ -254,7 +254,7 @@ int NetQuantize::quantize_convolutiondepthwise()
     return 0;
 }
 
-int NetQuantize::quantize_innerproduct()
+int NetQuantize::quantize_innerproduct(bool weight_only)
 {
     const int layer_count = static_cast<int>(layers.size());
     for (int i = 0; i < layer_count; i++)
@@ -262,6 +262,47 @@ int NetQuantize::quantize_innerproduct()
         // find convolution layer
         if (layers[i]->type != "InnerProduct")
             continue;
+
+        if (weight_only)
+        {
+            ncnn::InnerProduct* fc = (ncnn::InnerProduct*)layers[i];
+
+            const int num_output = fc->num_output;
+            const int num_input = fc->weight_data_size / num_output;
+
+            // compute
+            ncnn::Mat weight_scale;
+            weight_scale.create(num_output);
+
+            for (int n = 0; n < num_output; n++)
+            {
+                const ncnn::Mat weight_data_n = fc->weight_data.range(num_input * n, num_input);
+
+                float absmax = 0.f;
+                for (int k = 0; k < num_input; k++)
+                {
+                    absmax = std::max(absmax, (float)fabs(weight_data_n[k]));
+                }
+
+                weight_scale[n] = 127 / absmax;
+            }
+
+            ncnn::Mat weight_data_r2 = weight_scale.reshape(num_input, fc->num_output);
+
+            ncnn::Mat weight_data_int8;
+            ncnn::Option opt_q = opt;
+            opt_q.use_packing_layout = false;
+            ncnn::quantize_to_int8(weight_data_r2, weight_data_int8, weight_scale, opt_q);
+            if (weight_data_int8.empty())
+                return -100;
+
+            fc->weight_data = weight_data_int8.reshape(fc->weight_data_size);
+
+            fc->int8_scale_term = 1002;
+            fc->weight_data_int8_scales = weight_scale;
+
+            return 0;
+        }
 
         // find InnerProduct layer
         std::map<std::string, ncnn::Mat>::iterator iter_data = blob_int8scale_table.find(layers[i]->name);

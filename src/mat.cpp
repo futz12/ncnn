@@ -1675,6 +1675,32 @@ void dequantize_from_int32(const Mat& src, Mat& dst, const Mat& scale_data, cons
     delete dequantize;
 }
 
+void dequantize_from_int8(const Mat& src, Mat& dst, const Mat& scale_data, const Mat& bias_data, const Option& opt)
+{
+    Layer* dequantize = create_layer(LayerType::Dequantize);
+
+    ParamDict pd;
+    pd.set(0, scale_data.w);
+    pd.set(1, bias_data.w);
+    pd.set(2, 1); // from int8
+
+    dequantize->load_param(pd);
+
+    Mat weights[2];
+    weights[0] = scale_data;
+    weights[1] = bias_data;
+
+    dequantize->load_model(ModelBinFromMatArray(weights));
+
+    dequantize->create_pipeline(opt);
+
+    dequantize->forward(src, dst, opt);
+
+    dequantize->destroy_pipeline(opt);
+
+    delete dequantize;
+}
+
 void requantize_from_int32_to_int8(const Mat& src, Mat& dst, const Mat& scale_in_data, const Mat& scale_out_data, const Mat& bias_data, int activation_type, const Mat& activation_params, const Option& opt)
 {
     Layer* requantize = create_layer(LayerType::Requantize);

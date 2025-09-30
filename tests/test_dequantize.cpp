@@ -3,11 +3,12 @@
 
 #include "testutil.h"
 
-static int test_dequantize(const ncnn::Mat& a, int scale_data_size, int bias_data_size)
+static int test_dequantize(const ncnn::Mat& a, int scale_data_size, int bias_data_size, int dequantize_type = 0)
 {
     ncnn::ParamDict pd;
     pd.set(0, scale_data_size);
     pd.set(1, bias_data_size);
+    pd.set(2, dequantize_type);
 
     std::vector<ncnn::Mat> weights(bias_data_size ? 2 : 1);
     weights[0] = RandomMat(scale_data_size);
@@ -71,7 +72,31 @@ static int test_dequantize_0()
            || test_dequantize(RandomIntMat(3, 5, 13), 1, 0)
            || test_dequantize(RandomIntMat(3, 5, 13), 13, 13)
            || test_dequantize(RandomIntMat(3, 5, 13), 13, 1)
-           || test_dequantize(RandomIntMat(3, 5, 13), 13, 0);
+           || test_dequantize(RandomIntMat(3, 5, 13), 13, 0)
+           || test_dequantize(RandomS8Mat(11, 13, 48), 1, 48, 1)
+           || test_dequantize(RandomS8Mat(11, 13, 48), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(11, 13, 48), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(11, 13, 48), 48, 48, 1)
+           || test_dequantize(RandomS8Mat(11, 13, 48), 48, 1, 1)
+           || test_dequantize(RandomS8Mat(11, 13, 48), 48, 0, 1)
+           || test_dequantize(RandomS8Mat(5, 7, 24), 1, 24, 1)
+           || test_dequantize(RandomS8Mat(5, 7, 24), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(5, 7, 24), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(5, 7, 24), 24, 24, 1)
+           || test_dequantize(RandomS8Mat(5, 7, 24), 24, 1, 1)
+           || test_dequantize(RandomS8Mat(5, 7, 24), 24, 0, 1)
+           || test_dequantize(RandomS8Mat(7, 9, 12), 1, 12, 1)
+           || test_dequantize(RandomS8Mat(7, 9, 12), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(7, 9, 12), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(7, 9, 12), 12, 12, 1)
+           || test_dequantize(RandomS8Mat(7, 9, 12), 12, 1, 1)
+           || test_dequantize(RandomS8Mat(7, 9, 12), 12, 0, 1)
+           || test_dequantize(RandomS8Mat(3, 5, 13), 1, 13, 1)
+           || test_dequantize(RandomS8Mat(3, 5, 13), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(3, 5, 13), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(3, 5, 13), 13, 13, 1)
+           || test_dequantize(RandomS8Mat(3, 5, 13), 13, 1, 1)
+           || test_dequantize(RandomS8Mat(3, 5, 13), 13, 0, 1);
 }
 
 static int test_dequantize_1()
@@ -100,7 +125,31 @@ static int test_dequantize_1()
            || test_dequantize(RandomIntMat(19, 15), 1, 0)
            || test_dequantize(RandomIntMat(19, 15), 15, 15)
            || test_dequantize(RandomIntMat(19, 15), 15, 1)
-           || test_dequantize(RandomIntMat(19, 15), 15, 0);
+           || test_dequantize(RandomIntMat(19, 15), 15, 0)
+           || test_dequantize(RandomS8Mat(127, 48), 1, 48, 1)
+           || test_dequantize(RandomS8Mat(127, 48), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(127, 48), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(127, 48), 48, 48, 1)
+           || test_dequantize(RandomS8Mat(127, 48), 48, 1, 1)
+           || test_dequantize(RandomS8Mat(127, 48), 48, 0, 1)
+           || test_dequantize(RandomS8Mat(15, 24), 1, 24, 1)
+           || test_dequantize(RandomS8Mat(15, 24), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(15, 24), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(15, 24), 24, 24, 1)
+           || test_dequantize(RandomS8Mat(15, 24), 24, 1, 1)
+           || test_dequantize(RandomS8Mat(15, 24), 24, 0, 1)
+           || test_dequantize(RandomS8Mat(17, 12), 1, 12, 1)
+           || test_dequantize(RandomS8Mat(17, 12), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(17, 12), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(17, 12), 12, 12, 1)
+           || test_dequantize(RandomS8Mat(17, 12), 12, 1, 1)
+           || test_dequantize(RandomS8Mat(17, 12), 12, 0, 1)
+           || test_dequantize(RandomS8Mat(19, 15), 1, 15, 1)
+           || test_dequantize(RandomS8Mat(19, 15), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(19, 15), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(19, 15), 15, 15, 1)
+           || test_dequantize(RandomS8Mat(19, 15), 15, 1, 1)
+           || test_dequantize(RandomS8Mat(19, 15), 15, 0, 1);
 }
 
 static int test_dequantize_2()
@@ -113,7 +162,15 @@ static int test_dequantize_2()
            || test_dequantize(RandomIntMat(124), 1, 1)
            || test_dequantize(RandomIntMat(124), 1, 0)
            || test_dequantize(RandomIntMat(127), 1, 1)
-           || test_dequantize(RandomIntMat(127), 1, 0);
+           || test_dequantize(RandomIntMat(127), 1, 0)
+           || test_dequantize(RandomS8Mat(128), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(128), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(120), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(120), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(124), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(124), 1, 0, 1)
+           || test_dequantize(RandomS8Mat(127), 1, 1, 1)
+           || test_dequantize(RandomS8Mat(127), 1, 0, 1);
 }
 
 static int test_dequantize_3()
