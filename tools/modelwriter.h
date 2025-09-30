@@ -1899,7 +1899,8 @@ int ModelWriter::save(const char* parampath, const char* binpath)
                 if (op->int8_scale_term >= 1000)
                 {
                     fwrite_weight_data(op->weight_data_int8_scales, bp, 90, 100);
-                } else
+                }
+                else
                 {
                     fwrite_weight_data(op->weight_data_int8_scales, bp, 90, 100);
                     fwrite_weight_data(op->bottom_blob_int8_scales, bp, 0.001, 1);
