@@ -56,6 +56,47 @@ static int test_selu_3()
            || test_selu(RandomMat(120), 1.673264f, 1.050700f);
 }
 
+static int test_selu_packed()
+{
+    const float alpha = 1.673264f;
+    const float lambda = 1.050700f;
+
+    ncnn::ParamDict pd;
+    pd.set(0, alpha);
+    pd.set(1, lambda);
+
+    ncnn::Option opt;
+    opt.num_threads = 1;
+
+    ncnn::Layer* op = ncnn::create_layer_cpu("SELU");
+    op->load_param(pd);
+    op->create_pipeline(opt);
+
+    ncnn::Mat a = RandomMat(9, 7, 8);
+
+    ncnn::Mat b = a.clone();
+    op->forward_inplace(b, opt);
+
+    ncnn::Mat a4;
+    ncnn::convert_packing(a, a4, 4, opt);
+    ncnn::Mat c4 = a4.clone();
+    op->forward_inplace(c4, opt);
+
+    ncnn::Mat c;
+    ncnn::convert_packing(c4, c, 1, opt);
+
+    op->destroy_pipeline(opt);
+    delete op;
+
+    if (CompareMat(b, c, 0.001f) != 0)
+    {
+        fprintf(stderr, "test_selu_packed failed alpha=%f lambda=%f\n", alpha, lambda);
+        return -1;
+    }
+
+    return 0;
+}
+
 int main()
 {
     SRAND(7767517);
@@ -64,5 +105,6 @@ int main()
            || test_selu_0()
            || test_selu_1()
            || test_selu_2()
-           || test_selu_3();
+           || test_selu_3()
+           || test_selu_packed();
 }
