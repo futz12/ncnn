@@ -1,21 +1,21 @@
-// Copyright 2021 Xavier Hsinyuan <me@lstlx.com>
+// Copyright 2026 Tencent
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef LAYER_SELU_RISCV_H
-#define LAYER_SELU_RISCV_H
+#ifndef LAYER_SELU_LOONGARCH_H
+#define LAYER_SELU_LOONGARCH_H
 
 #include "selu.h"
 
 namespace ncnn {
 
-class SELU_riscv : public SELU
+class SELU_loongarch : public SELU
 {
 public:
-    SELU_riscv();
+    SELU_loongarch();
 
     virtual int forward_inplace(Mat& bottom_top_blob, const Option& opt) const;
 };
 
 } // namespace ncnn
 
-#endif // LAYER_SELU_RISCV_H
+#endif // LAYER_SELU_LOONGARCH_H
