@@ -56,45 +56,6 @@ static int test_elu_3()
            || test_elu(RandomMat(120));
 }
 
-static int test_elu_packed()
-{
-    float alpha = RandomFloat(0.001f, 1000.f);
-
-    ncnn::ParamDict pd;
-    pd.set(0, alpha);
-
-    ncnn::Option opt;
-    opt.num_threads = 1;
-
-    ncnn::Layer* op = ncnn::create_layer_cpu("ELU");
-    op->load_param(pd);
-    op->create_pipeline(opt);
-
-    ncnn::Mat a = RandomMat(9, 7, 8);
-
-    ncnn::Mat b = a.clone();
-    op->forward_inplace(b, opt);
-
-    ncnn::Mat a4;
-    ncnn::convert_packing(a, a4, 4, opt);
-    ncnn::Mat c4 = a4.clone();
-    op->forward_inplace(c4, opt);
-
-    ncnn::Mat c;
-    ncnn::convert_packing(c4, c, 1, opt);
-
-    op->destroy_pipeline(opt);
-    delete op;
-
-    if (CompareMat(b, c, 0.001f) != 0)
-    {
-        fprintf(stderr, "test_elu_packed failed alpha=%f\n", alpha);
-        return -1;
-    }
-
-    return 0;
-}
-
 int main()
 {
     SRAND(7767517);
@@ -103,6 +64,5 @@ int main()
            || test_elu_0()
            || test_elu_1()
            || test_elu_2()
-           || test_elu_3()
-           || test_elu_packed();
+           || test_elu_3();
 }

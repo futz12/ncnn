@@ -1,21 +1,21 @@
 // Copyright 2017 Tencent
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef LAYER_SELU_ARM_H
-#define LAYER_SELU_ARM_H
+#ifndef LAYER_ELU_ARM_H
+#define LAYER_ELU_ARM_H
 
-#include "selu.h"
+#include "elu.h"
 
 namespace ncnn {
 
-class SELU_arm : public SELU
+class ELU_arm : public ELU
 {
 public:
-    SELU_arm();
+    ELU_arm();
 
     virtual int forward_inplace(Mat& bottom_top_blob, const Option& opt) const;
 };
 
 } // namespace ncnn
 
-#endif // LAYER_SELU_ARM_H
+#endif // LAYER_ELU_ARM_H

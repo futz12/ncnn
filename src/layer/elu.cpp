@@ -24,7 +24,7 @@ int ELU::forward_inplace(Mat& bottom_top_blob, const Option& opt) const
     int h = bottom_top_blob.h;
     int d = bottom_top_blob.d;
     int channels = bottom_top_blob.c;
-    int size = w * h * d * bottom_top_blob.elempack;
+    int size = w * h * d;
 
     #pragma omp parallel for num_threads(opt.num_threads)
     for (int q = 0; q < channels; q++)
