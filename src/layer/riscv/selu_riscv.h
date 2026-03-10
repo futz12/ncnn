@@ -11,6 +11,8 @@ namespace ncnn {
 class SELU_riscv : public SELU
 {
 public:
+    SELU_riscv();
+
     virtual int forward_inplace(Mat& bottom_top_blob, const Option& opt) const;
 };
 
