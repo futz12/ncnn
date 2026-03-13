@@ -86,15 +86,12 @@ int Convolution_arm::create_pipeline_fp16s(const Option& opt)
     }
 
     bool prefer_winograd = (opt.use_winograd23_convolution || opt.use_winograd43_convolution || opt.use_winograd63_convolution) && (num_input >= 16 || num_output >= 16);
-    if (!opt.use_packing_layout && (num_input % 4 != 0 || num_output % 4 != 0))
-    {
-        prefer_winograd = false;
-    }
+    const bool allow_winograd63_fp16sa = opt.use_packing_layout || (num_input % 4 == 0 && num_output % 4 == 0);
 
     if (opt.use_fp16_arithmetic && opt.use_winograd_convolution && prefer_winograd && kernel_w == 3 && kernel_h == 3 && dilation_w == 1 && dilation_h == 1 && stride_w == 1 && stride_h == 1)
     {
         // dynamic shape
-        if (opt.use_winograd63_convolution && (num_input <= 128 && num_output <= 128))
+        if (allow_winograd63_fp16sa && opt.use_winograd63_convolution && (num_input <= 128 && num_output <= 128))
             conv3x3s1_winograd63_transform_kernel_fp16sa(weight_data, weight_winograd63_data, num_input, num_output, opt);
         else if (opt.use_winograd43_convolution && (num_input >= 16 && num_output >= 16))
             conv3x3s1_winograd43_transform_kernel_fp16sa(weight_data, weight_winograd43_data, num_input, num_output, opt);
@@ -114,10 +111,6 @@ int Convolution_arm::create_pipeline_fp16s(const Option& opt)
 
     int l2_cache_size_fp16 = get_cpu_level2_cache_size() / sizeof(unsigned short);
     bool prefer_sgemm = num_input * num_output * kernel_w * kernel_h * dilation_w * dilation_h * stride_w * stride_h * 2 > l2_cache_size_fp16 || (num_input > 16 || num_output > 16);
-    if (!opt.use_packing_layout && (num_input % 4 != 0 || num_output % 4 != 0))
-    {
-        prefer_sgemm = false;
-    }
 
 #if NCNN_GNU_INLINE_ASM
     if (elempack == 8 && out_elempack == 8)
@@ -325,10 +318,7 @@ int Convolution_arm::forward_fp16sa(const Mat& bottom_blob, Mat& top_blob, const
     const int num_input = channels * elempack;
 
     bool prefer_winograd = (opt.use_winograd23_convolution || opt.use_winograd43_convolution || opt.use_winograd63_convolution) && (num_input >= 16 || num_output >= 16);
-    if (!opt.use_packing_layout && (num_input % 4 != 0 || num_output % 4 != 0))
-    {
-        prefer_winograd = false;
-    }
+    const bool allow_winograd63_fp16sa = opt.use_packing_layout || (num_input % 4 == 0 && num_output % 4 == 0);
 
     if (opt.use_winograd_convolution && prefer_winograd && kernel_w == 3 && kernel_h == 3 && dilation_w == 1 && dilation_h == 1 && stride_w == 1 && stride_h == 1)
     {
@@ -354,7 +344,7 @@ int Convolution_arm::forward_fp16sa(const Mat& bottom_blob, Mat& top_blob, const
         {
             // f43 fallback to f63 or f23
             prefer_winograd43 = false;
-            if (opt.use_winograd63_convolution && !weight_winograd63_data.empty())
+            if (allow_winograd63_fp16sa && opt.use_winograd63_convolution && !weight_winograd63_data.empty())
             {
                 prefer_winograd63 = true;
             }
@@ -402,10 +392,6 @@ int Convolution_arm::forward_fp16sa(const Mat& bottom_blob, Mat& top_blob, const
 
     int l2_cache_size_fp16 = get_cpu_level2_cache_size() / sizeof(unsigned short);
     bool prefer_sgemm = num_input * num_output * kernel_w * kernel_h * dilation_w * dilation_h * stride_w * stride_h * 2 > l2_cache_size_fp16 || (num_input > 16 || num_output > 16);
-    if (!opt.use_packing_layout && (num_input % 4 != 0 || num_output % 4 != 0))
-    {
-        prefer_sgemm = false;
-    }
 
 #if NCNN_GNU_INLINE_ASM
     if (elempack == 8 && out_elempack == 8)
