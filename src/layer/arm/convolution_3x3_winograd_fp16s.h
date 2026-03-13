@@ -5709,79 +5709,79 @@ static inline void conv3x3s1_winograd63_transform_output_tile_fp16sa(const Mat& 
                 if (ti * 6 + m >= outh)
                     continue;
 
-                __fp16 r00 = tmp[m][0][0];
-                __fp16 r01 = tmp[m][0][1];
-                __fp16 r10 = tmp[m][1][0];
-                __fp16 r11 = tmp[m][1][1];
-                __fp16 r20 = tmp[m][2][0];
-                __fp16 r21 = tmp[m][2][1];
-                __fp16 r30 = tmp[m][3][0];
-                __fp16 r31 = tmp[m][3][1];
-                __fp16 r40 = tmp[m][4][0];
-                __fp16 r41 = tmp[m][4][1];
-                __fp16 r50 = tmp[m][5][0];
-                __fp16 r51 = tmp[m][5][1];
-                __fp16 r60 = tmp[m][6][0];
-                __fp16 r61 = tmp[m][6][1];
-                __fp16 r70 = tmp[m][7][0];
-                __fp16 r71 = tmp[m][7][1];
+                float r00 = (float)tmp[m][0][0];
+                float r01 = (float)tmp[m][0][1];
+                float r10 = (float)tmp[m][1][0];
+                float r11 = (float)tmp[m][1][1];
+                float r20 = (float)tmp[m][2][0];
+                float r21 = (float)tmp[m][2][1];
+                float r30 = (float)tmp[m][3][0];
+                float r31 = (float)tmp[m][3][1];
+                float r40 = (float)tmp[m][4][0];
+                float r41 = (float)tmp[m][4][1];
+                float r50 = (float)tmp[m][5][0];
+                float r51 = (float)tmp[m][5][1];
+                float r60 = (float)tmp[m][6][0];
+                float r61 = (float)tmp[m][6][1];
+                float r70 = (float)tmp[m][7][0];
+                float r71 = (float)tmp[m][7][1];
 
-                __fp16 tmp024a0 = r10 + r20;
-                __fp16 tmp024a1 = r11 + r21;
-                __fp16 tmp135a0 = r10 - r20;
-                __fp16 tmp135a1 = r11 - r21;
-                __fp16 tmp024b0 = r30 + r40;
-                __fp16 tmp024b1 = r31 + r41;
-                __fp16 tmp135b0 = r30 - r40;
-                __fp16 tmp135b1 = r31 - r41;
-                __fp16 tmp024c0 = r50 + r60;
-                __fp16 tmp024c1 = r51 + r61;
-                __fp16 tmp135c0 = r50 - r60;
-                __fp16 tmp135c1 = r51 - r61;
+                float tmp024a0 = r10 + r20;
+                float tmp024a1 = r11 + r21;
+                float tmp135a0 = r10 - r20;
+                float tmp135a1 = r11 - r21;
+                float tmp024b0 = r30 + r40;
+                float tmp024b1 = r31 + r41;
+                float tmp135b0 = r30 - r40;
+                float tmp135b1 = r31 - r41;
+                float tmp024c0 = r50 + r60;
+                float tmp024c1 = r51 + r61;
+                float tmp135c0 = r50 - r60;
+                float tmp135c1 = r51 - r61;
 
-                __fp16 tmp00 = bias0 + r00 + tmp024a0 + tmp024b0 + tmp024c0 * (__fp16)32;
-                __fp16 tmp01 = bias1 + r01 + tmp024a1 + tmp024b1 + tmp024c1 * (__fp16)32;
-                __fp16 tmp10 = bias0 + tmp135a0 + tmp135b0 + tmp135b0 + tmp135c0 * (__fp16)16;
-                __fp16 tmp11 = bias1 + tmp135a1 + tmp135b1 + tmp135b1 + tmp135c1 * (__fp16)16;
-                __fp16 tmp20 = bias0 + tmp024a0 + tmp024b0 * (__fp16)4 + tmp024c0 * (__fp16)8;
-                __fp16 tmp21 = bias1 + tmp024a1 + tmp024b1 * (__fp16)4 + tmp024c1 * (__fp16)8;
-                __fp16 tmp30 = bias0 + tmp135a0 + tmp135b0 * (__fp16)8 + tmp135c0 * (__fp16)4;
-                __fp16 tmp31 = bias1 + tmp135a1 + tmp135b1 * (__fp16)8 + tmp135c1 * (__fp16)4;
-                __fp16 tmp40 = bias0 + tmp024a0 + tmp024b0 * (__fp16)16 + tmp024c0 + tmp024c0;
-                __fp16 tmp41 = bias1 + tmp024a1 + tmp024b1 * (__fp16)16 + tmp024c1 + tmp024c1;
-                __fp16 tmp50 = bias0 + r70 + tmp135a0 + tmp135b0 * (__fp16)32 + tmp135c0;
-                __fp16 tmp51 = bias1 + r71 + tmp135a1 + tmp135b1 * (__fp16)32 + tmp135c1;
+                float tmp00 = (float)bias0 + r00 + tmp024a0 + tmp024b0 + tmp024c0 * 32.f;
+                float tmp01 = (float)bias1 + r01 + tmp024a1 + tmp024b1 + tmp024c1 * 32.f;
+                float tmp10 = (float)bias0 + tmp135a0 + tmp135b0 + tmp135b0 + tmp135c0 * 16.f;
+                float tmp11 = (float)bias1 + tmp135a1 + tmp135b1 + tmp135b1 + tmp135c1 * 16.f;
+                float tmp20 = (float)bias0 + tmp024a0 + tmp024b0 * 4.f + tmp024c0 * 8.f;
+                float tmp21 = (float)bias1 + tmp024a1 + tmp024b1 * 4.f + tmp024c1 * 8.f;
+                float tmp30 = (float)bias0 + tmp135a0 + tmp135b0 * 8.f + tmp135c0 * 4.f;
+                float tmp31 = (float)bias1 + tmp135a1 + tmp135b1 * 8.f + tmp135c1 * 4.f;
+                float tmp40 = (float)bias0 + tmp024a0 + tmp024b0 * 16.f + tmp024c0 + tmp024c0;
+                float tmp41 = (float)bias1 + tmp024a1 + tmp024b1 * 16.f + tmp024c1 + tmp024c1;
+                float tmp50 = (float)bias0 + r70 + tmp135a0 + tmp135b0 * 32.f + tmp135c0;
+                float tmp51 = (float)bias1 + r71 + tmp135a1 + tmp135b1 * 32.f + tmp135c1;
 
                 // if (out_elempack == 1)
                 {
                     __fp16* outptr1 = outptr0 + N;
 
-                    outptr0[0] = tmp00;
-                    outptr1[0] = tmp01;
+                    outptr0[0] = (__fp16)tmp00;
+                    outptr1[0] = (__fp16)tmp01;
                     if (tj * 6 + 1 < outw)
                     {
-                        outptr0[1] = tmp10;
-                        outptr1[1] = tmp11;
+                        outptr0[1] = (__fp16)tmp10;
+                        outptr1[1] = (__fp16)tmp11;
                     }
                     if (tj * 6 + 2 < outw)
                     {
-                        outptr0[2] = tmp20;
-                        outptr1[2] = tmp21;
+                        outptr0[2] = (__fp16)tmp20;
+                        outptr1[2] = (__fp16)tmp21;
                     }
                     if (tj * 6 + 3 < outw)
                     {
-                        outptr0[3] = tmp30;
-                        outptr1[3] = tmp31;
+                        outptr0[3] = (__fp16)tmp30;
+                        outptr1[3] = (__fp16)tmp31;
                     }
                     if (tj * 6 + 4 < outw)
                     {
-                        outptr0[4] = tmp40;
-                        outptr1[4] = tmp41;
+                        outptr0[4] = (__fp16)tmp40;
+                        outptr1[4] = (__fp16)tmp41;
                     }
                     if (tj * 6 + 5 < outw)
                     {
-                        outptr0[5] = tmp50;
-                        outptr1[5] = tmp51;
+                        outptr0[5] = (__fp16)tmp50;
+                        outptr1[5] = (__fp16)tmp51;
                     }
                 }
 
@@ -5843,37 +5843,37 @@ static inline void conv3x3s1_winograd63_transform_output_tile_fp16sa(const Mat& 
                 if (ti * 6 + m >= outh)
                     continue;
 
-                __fp16 r0 = tmp[m][0];
-                __fp16 r1 = tmp[m][1];
-                __fp16 r2 = tmp[m][2];
-                __fp16 r3 = tmp[m][3];
-                __fp16 r4 = tmp[m][4];
-                __fp16 r5 = tmp[m][5];
-                __fp16 r6 = tmp[m][6];
-                __fp16 r7 = tmp[m][7];
+                float r0 = (float)tmp[m][0];
+                float r1 = (float)tmp[m][1];
+                float r2 = (float)tmp[m][2];
+                float r3 = (float)tmp[m][3];
+                float r4 = (float)tmp[m][4];
+                float r5 = (float)tmp[m][5];
+                float r6 = (float)tmp[m][6];
+                float r7 = (float)tmp[m][7];
 
-                __fp16 tmp024a = r1 + r2;
-                __fp16 tmp135a = r1 - r2;
-                __fp16 tmp024b = r3 + r4;
-                __fp16 tmp135b = r3 - r4;
-                __fp16 tmp024c = r5 + r6;
-                __fp16 tmp135c = r5 - r6;
+                float tmp024a = r1 + r2;
+                float tmp135a = r1 - r2;
+                float tmp024b = r3 + r4;
+                float tmp135b = r3 - r4;
+                float tmp024c = r5 + r6;
+                float tmp135c = r5 - r6;
 
-                __fp16 tmp0 = bias0 + r0 + tmp024a + tmp024b + tmp024c * (__fp16)32;
-                __fp16 tmp1 = bias0 + tmp135a + tmp135b + tmp135b + tmp135c * (__fp16)16;
-                __fp16 tmp2 = bias0 + tmp024a + tmp024b * (__fp16)4 + tmp024c * (__fp16)8;
-                __fp16 tmp3 = bias0 + tmp135a + tmp135b * (__fp16)8 + tmp135c * (__fp16)4;
-                __fp16 tmp4 = bias0 + tmp024a + tmp024b * (__fp16)16 + tmp024c + tmp024c;
-                __fp16 tmp5 = bias0 + r7 + tmp135a + tmp135b * (__fp16)32 + tmp135c;
+                float tmp0 = (float)bias0 + r0 + tmp024a + tmp024b + tmp024c * 32.f;
+                float tmp1 = (float)bias0 + tmp135a + tmp135b + tmp135b + tmp135c * 16.f;
+                float tmp2 = (float)bias0 + tmp024a + tmp024b * 4.f + tmp024c * 8.f;
+                float tmp3 = (float)bias0 + tmp135a + tmp135b * 8.f + tmp135c * 4.f;
+                float tmp4 = (float)bias0 + tmp024a + tmp024b * 16.f + tmp024c + tmp024c;
+                float tmp5 = (float)bias0 + r7 + tmp135a + tmp135b * 32.f + tmp135c;
 
                 // if (out_elempack == 1)
                 {
-                    outptr0[0] = tmp0;
-                    if (tj * 6 + 1 < outw) outptr0[1] = tmp1;
-                    if (tj * 6 + 2 < outw) outptr0[2] = tmp2;
-                    if (tj * 6 + 3 < outw) outptr0[3] = tmp3;
-                    if (tj * 6 + 4 < outw) outptr0[4] = tmp4;
-                    if (tj * 6 + 5 < outw) outptr0[5] = tmp5;
+                    outptr0[0] = (__fp16)tmp0;
+                    if (tj * 6 + 1 < outw) outptr0[1] = (__fp16)tmp1;
+                    if (tj * 6 + 2 < outw) outptr0[2] = (__fp16)tmp2;
+                    if (tj * 6 + 3 < outw) outptr0[3] = (__fp16)tmp3;
+                    if (tj * 6 + 4 < outw) outptr0[4] = (__fp16)tmp4;
+                    if (tj * 6 + 5 < outw) outptr0[5] = (__fp16)tmp5;
                 }
 
                 outptr0 += outw;
