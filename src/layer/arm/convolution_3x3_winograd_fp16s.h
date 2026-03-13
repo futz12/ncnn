@@ -476,6 +476,7 @@ static void conv3x3s1_winograd_gemm_transB_packed_tile_fp16sa(const Mat& AT_tile
 {
     // NCNN_LOGE("conv3x3s1_winograd_gemm_transB_packed_tile_fp16sa %d %d %d", max_ii, max_jj, max_kk);
     __fp16* outptr = top_blob;
+    const bool use_a53_a55_optimized_kernel_enabled = use_a53_a55_optimized_kernel && (max_kk % 4 == 0);
 
     int ii = 0;
     for (; ii + 7 < max_ii; ii += 8)
@@ -491,7 +492,7 @@ static void conv3x3s1_winograd_gemm_transB_packed_tile_fp16sa(const Mat& AT_tile
                 const __fp16* pA = pAT;
 
 #if NCNN_GNU_INLINE_ASM
-                if (use_a53_a55_optimized_kernel)
+                if (use_a53_a55_optimized_kernel_enabled)
                 {
                     asm volatile(
                         "cbz    %w7, 0f                     \n"
@@ -878,7 +879,7 @@ static void conv3x3s1_winograd_gemm_transB_packed_tile_fp16sa(const Mat& AT_tile
                 const __fp16* pA = pAT;
 
 #if NCNN_GNU_INLINE_ASM
-                if (use_a53_a55_optimized_kernel)
+                if (use_a53_a55_optimized_kernel_enabled)
                 {
                     asm volatile(
                         "cbz    %w7, 0f                     \n"
