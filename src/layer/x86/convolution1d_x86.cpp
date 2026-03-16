@@ -23,7 +23,7 @@ Convolution1D_x86::Convolution1D_x86()
 #endif // __SSE2__
 }
 
-int Convolution1D_x86::create_pipeline(const Option& opt)
+int Convolution1D_x86::create_pipeline(const Option& /*opt*/)
 {
     if (dynamic_weight)
         return 0;
@@ -31,9 +31,6 @@ int Convolution1D_x86::create_pipeline(const Option& opt)
     int num_input = weight_data_size / kernel_w / num_output;
 
     convolution1d_transform_kernel_packed(weight_data, weight_data_tm, num_input, num_output, kernel_w);
-
-    if (opt.lightmode)
-        weight_data.release();
 
     return 0;
 }
@@ -45,6 +42,9 @@ int Convolution1D_x86::destroy_pipeline(const Option& /*opt*/)
 
 int Convolution1D_x86::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    if (bottom_blob.dims == 3)
+        return Convolution1D::forward(bottom_blob, top_blob, opt);
+
     int w = bottom_blob.w;
     size_t elemsize = bottom_blob.elemsize;
     int elempack = bottom_blob.elempack;

@@ -67,88 +67,91 @@ int ConvolutionDepthWise1D::load_model(const ModelBin& mb)
 
 static int convolutiondepthwise1d(const Mat& bottom_blob, Mat& top_blob, const Mat& weight_data, const Mat& bias_data, int kernel_w, int stride_w, int dilation_w, int group, int activation_type, const Mat& activation_params, const Option& opt)
 {
-    const int h = bottom_blob.h;
+    const int channels = bottom_blob.dims == 3 ? bottom_blob.c : 1;
 
-    const int outw = top_blob.w;
-    const int outh = top_blob.h;
-
-    const int bias_term = bias_data.empty() ? 0 : 1;
-
-    // depth-wise
-    if (h == group && group == outh)
+    #pragma omp parallel for num_threads(opt.num_threads)
+    for (int i = 0; i < channels; i++)
     {
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int g = 0; g < group; g++)
+        const Mat bottom_blob_i = channels == 1 ? bottom_blob : bottom_blob.channel(i);
+        Mat top_blob_i = channels == 1 ? top_blob : top_blob.channel(i);
+
+        const int h = bottom_blob_i.h;
+
+        const int outw = top_blob_i.w;
+        const int outh = top_blob_i.h;
+
+        const int bias_term = bias_data.empty() ? 0 : 1;
+
+        // depth-wise
+        if (h == group && group == outh)
         {
-            float* outptr = top_blob.row(g);
-            const float* kptr = (const float*)weight_data + kernel_w * g;
-
-            for (int j = 0; j < outw; j++)
+            for (int g = 0; g < group; g++)
             {
-                float sum = 0.f;
-
-                if (bias_term)
-                    sum = bias_data[g];
-
-                const float* sptr = bottom_blob.row(g) + j * stride_w;
-
-                for (int k = 0; k < kernel_w; k++)
-                {
-                    float val = *sptr;
-                    float w = kptr[k];
-                    sum += val * w;
-
-                    sptr += dilation_w;
-                }
-
-                outptr[j] = activation_ss(sum, activation_type, activation_params);
-            }
-        }
-    }
-    else
-    {
-        // group convolution
-        const int h_g = h / group;
-        const int outh_g = outh / group;
-
-#ifdef _WIN32
-        #pragma omp parallel for num_threads(opt.num_threads)
-#else
-        #pragma omp parallel for collapse(2) num_threads(opt.num_threads)
-#endif
-        for (int g = 0; g < group; g++)
-        {
-            for (int p = 0; p < outh_g; p++)
-            {
-                float* outptr = top_blob.row(g * outh_g + p);
-                const float* weight_data_ptr = (const float*)weight_data + kernel_w * h_g * outh_g * g;
+                float* outptr = top_blob_i.row(g);
+                const float* kptr = (const float*)weight_data + kernel_w * g;
 
                 for (int j = 0; j < outw; j++)
                 {
                     float sum = 0.f;
 
                     if (bias_term)
-                        sum = bias_data[outh_g * g + p];
+                        sum = bias_data[g];
 
-                    const float* kptr = weight_data_ptr + kernel_w * h_g * p;
+                    const float* sptr = bottom_blob_i.row(g) + j * stride_w;
 
-                    for (int q = 0; q < h_g; q++)
+                    for (int k = 0; k < kernel_w; k++)
                     {
-                        const float* sptr = bottom_blob.row(h_g * g + q) + j * stride_w;
+                        float val = *sptr;
+                        float w = kptr[k];
+                        sum += val * w;
 
-                        for (int k = 0; k < kernel_w; k++)
-                        {
-                            float val = *sptr;
-                            float w = kptr[k];
-                            sum += val * w;
-
-                            sptr += dilation_w;
-                        }
-
-                        kptr += kernel_w;
+                        sptr += dilation_w;
                     }
 
                     outptr[j] = activation_ss(sum, activation_type, activation_params);
+                }
+            }
+        }
+        else
+        {
+            // group convolution
+            const int h_g = h / group;
+            const int outh_g = outh / group;
+
+            for (int g = 0; g < group; g++)
+            {
+                for (int p = 0; p < outh_g; p++)
+                {
+                    float* outptr = top_blob_i.row(g * outh_g + p);
+                    const float* weight_data_ptr = (const float*)weight_data + kernel_w * h_g * outh_g * g;
+
+                    for (int j = 0; j < outw; j++)
+                    {
+                        float sum = 0.f;
+
+                        if (bias_term)
+                            sum = bias_data[outh_g * g + p];
+
+                        const float* kptr = weight_data_ptr + kernel_w * h_g * p;
+
+                        for (int q = 0; q < h_g; q++)
+                        {
+                            const float* sptr = bottom_blob_i.row(h_g * g + q) + j * stride_w;
+
+                            for (int k = 0; k < kernel_w; k++)
+                            {
+                                float val = *sptr;
+                                float w = kptr[k];
+                                sum += val * w;
+
+                                sptr += dilation_w;
+                            }
+
+                            kptr += kernel_w;
+                        }
+
+                        outptr[j] = activation_ss(sum, activation_type, activation_params);
+                    }
                 }
             }
         }
@@ -171,7 +174,12 @@ int ConvolutionDepthWise1D::forward(const Mat& bottom_blob, Mat& top_blob, const
 
     const int outw = (w - kernel_extent_w) / stride_w + 1;
 
-    top_blob.create(outw, num_output, elemsize, opt.blob_allocator);
+    const int channels = bottom_blob_bordered.dims == 3 ? bottom_blob_bordered.c : 1;
+
+    if (channels == 1)
+        top_blob.create(outw, num_output, elemsize, opt.blob_allocator);
+    else
+        top_blob.create(outw, num_output, channels, elemsize, opt.blob_allocator);
     if (top_blob.empty())
         return -100;
 
@@ -217,7 +225,12 @@ int ConvolutionDepthWise1D::forward(const std::vector<Mat>& bottom_blobs, std::v
 
     const int outw = (w - kernel_extent_w) / stride_w + 1;
 
-    top_blob.create(outw, _num_output, elemsize, opt.blob_allocator);
+    const int channels = bottom_blob_bordered.dims == 3 ? bottom_blob_bordered.c : 1;
+
+    if (channels == 1)
+        top_blob.create(outw, _num_output, elemsize, opt.blob_allocator);
+    else
+        top_blob.create(outw, _num_output, channels, elemsize, opt.blob_allocator);
     if (top_blob.empty())
         return -100;
 

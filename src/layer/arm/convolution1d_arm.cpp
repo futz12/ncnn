@@ -57,9 +57,6 @@ int Convolution1D_arm::create_pipeline(const Option& opt)
 
     convolution1d_transform_kernel_packed(weight_data, weight_data_tm, num_input, num_output, kernel_w);
 
-    if (opt.lightmode)
-        weight_data.release();
-
     return 0;
 }
 
@@ -70,6 +67,9 @@ int Convolution1D_arm::destroy_pipeline(const Option& /*opt*/)
 
 int Convolution1D_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    if (bottom_blob.dims == 3)
+        return Convolution1D::forward(bottom_blob, top_blob, opt);
+
     int elembits = bottom_blob.elembits();
 
 #if NCNN_ARM82
@@ -228,9 +228,6 @@ int Convolution1D_arm::create_pipeline_bf16s(const Option& opt)
     const int num_input = weight_data_size / kernel_w / num_output;
 
     convolution1d_transform_kernel_packed_bf16s(weight_data, weight_data_tm, num_input, num_output, kernel_w);
-
-    if (opt.lightmode)
-        weight_data.release();
 
     return 0;
 }
