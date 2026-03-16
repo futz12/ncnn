@@ -88,9 +88,6 @@ int Convolution1D_riscv::create_pipeline(const Option& opt)
         }
     }
 
-    if (opt.lightmode)
-        weight_data.release();
-
     return 0;
 }
 
@@ -101,6 +98,9 @@ int Convolution1D_riscv::destroy_pipeline(const Option& /*opt*/)
 
 int Convolution1D_riscv::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    if (bottom_blob.dims == 3)
+        return Convolution1D::forward(bottom_blob, top_blob, opt);
+
 #if NCNN_ZFH
     int elembits = bottom_blob.elembits();
 

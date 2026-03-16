@@ -45,7 +45,7 @@ def test():
     net.eval()
 
     torch.manual_seed(0)
-    x = torch.rand(1, 12, 64)
+    x = torch.rand(3, 12, 64)
 
     a = net(x)
 
@@ -55,7 +55,7 @@ def test():
 
     # torchscript to pnnx
     import os
-    os.system("../../src/pnnx test_nn_Conv1d.pt inputshape=[1,12,64]")
+    os.system("../../src/pnnx test_nn_Conv1d.pt inputshape=[3,12,64]")
 
     # ncnn inference
     import test_nn_Conv1d_ncnn

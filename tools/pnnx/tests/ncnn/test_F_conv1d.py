@@ -30,11 +30,11 @@ def test():
     net.eval()
 
     torch.manual_seed(0)
-    x = torch.rand(1, 12, 52)
+    x = torch.rand(3, 12, 52)
     w0 = torch.rand(16, 12, 3)
     w1 = torch.rand(16, 8, 5)
     b1 = torch.rand(16)
-    y = torch.rand(1, 6, 25)
+    y = torch.rand(3, 6, 25)
 
     a0, a1 = net(x, w0, w1, b1, y)
 
@@ -44,7 +44,7 @@ def test():
 
     # torchscript to pnnx
     import os
-    os.system("../../src/pnnx test_F_conv1d.pt inputshape=[1,12,52],[16,12,3],[16,8,5],[16],[1,6,25]")
+    os.system("../../src/pnnx test_F_conv1d.pt inputshape=[3,12,52],[16,12,3],[16,8,5],[16],[3,6,25]")
 
     # ncnn inference
     import test_F_conv1d_ncnn

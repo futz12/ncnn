@@ -67,9 +67,6 @@ int Convolution1D_loongarch::create_pipeline(const Option& opt)
         }
     }
 
-    if (opt.lightmode)
-        weight_data.release();
-
     return 0;
 }
 
@@ -80,6 +77,9 @@ int Convolution1D_loongarch::destroy_pipeline(const Option& /*opt*/)
 
 int Convolution1D_loongarch::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    if (bottom_blob.dims == 3)
+        return Convolution1D::forward(bottom_blob, top_blob, opt);
+
     int w = bottom_blob.w;
     int h = bottom_blob.h;
     size_t elemsize = bottom_blob.elemsize;

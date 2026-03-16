@@ -59,45 +59,93 @@ int Convolution1D::load_model(const ModelBin& mb)
 static int convolution1d(const Mat& bottom_blob, Mat& top_blob, const Mat& weight_data, const Mat& bias_data, int kernel_w, int stride_w, int dilation_w, int activation_type, const Mat& activation_params, const Option& opt)
 {
     const int h = bottom_blob.h;
+    const int channels = bottom_blob.dims == 3 ? bottom_blob.c : 1;
 
     const int outw = top_blob.w;
     const int outh = top_blob.h;
 
     const int bias_term = bias_data.empty() ? 0 : 1;
 
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int p = 0; p < outh; p++)
+    if (channels == 1)
     {
-        float* outptr = top_blob.row(p);
-
-        for (int j = 0; j < outw; j++)
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int p = 0; p < outh; p++)
         {
-            float sum = 0.f;
+            float* outptr = top_blob.row(p);
 
-            if (bias_term)
-                sum = bias_data[p];
-
-            const float* kptr = (const float*)weight_data + kernel_w * h * p;
-
-            for (int q = 0; q < h; q++)
+            for (int j = 0; j < outw; j++)
             {
-                const float* sptr = bottom_blob.row(q) + j * stride_w;
+                float sum = 0.f;
 
-                for (int k = 0; k < kernel_w; k++)
+                if (bias_term)
+                    sum = bias_data[p];
+
+                const float* kptr = (const float*)weight_data + kernel_w * h * p;
+
+                for (int q = 0; q < h; q++)
                 {
-                    float val = *sptr;
-                    float wt = kptr[k];
-                    sum += val * wt;
+                    const float* sptr = bottom_blob.row(q) + j * stride_w;
 
-                    sptr += dilation_w;
+                    for (int k = 0; k < kernel_w; k++)
+                    {
+                        float val = *sptr;
+                        float wt = kptr[k];
+                        sum += val * wt;
+
+                        sptr += dilation_w;
+                    }
+
+                    kptr += kernel_w;
                 }
 
-                kptr += kernel_w;
+                sum = activation_ss(sum, activation_type, activation_params);
+
+                outptr[j] = sum;
             }
+        }
+    }
+    else
+    {
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
+        {
+            const Mat bottom_blob_q = bottom_blob.channel(q);
+            Mat top_blob_q = top_blob.channel(q);
 
-            sum = activation_ss(sum, activation_type, activation_params);
+            for (int p = 0; p < outh; p++)
+            {
+                float* outptr = top_blob_q.row(p);
 
-            outptr[j] = sum;
+                for (int j = 0; j < outw; j++)
+                {
+                    float sum = 0.f;
+
+                    if (bias_term)
+                        sum = bias_data[p];
+
+                    const float* kptr = (const float*)weight_data + kernel_w * h * p;
+
+                    for (int r = 0; r < h; r++)
+                    {
+                        const float* sptr = bottom_blob_q.row(r) + j * stride_w;
+
+                        for (int k = 0; k < kernel_w; k++)
+                        {
+                            float val = *sptr;
+                            float wt = kptr[k];
+                            sum += val * wt;
+
+                            sptr += dilation_w;
+                        }
+
+                        kptr += kernel_w;
+                    }
+
+                    sum = activation_ss(sum, activation_type, activation_params);
+
+                    outptr[j] = sum;
+                }
+            }
         }
     }
 
@@ -118,7 +166,12 @@ int Convolution1D::forward(const Mat& bottom_blob, Mat& top_blob, const Option& 
 
     const int outw = (w - kernel_extent_w) / stride_w + 1;
 
-    top_blob.create(outw, num_output, elemsize, opt.blob_allocator);
+    const int channels = bottom_blob_bordered.dims == 3 ? bottom_blob_bordered.c : 1;
+
+    if (channels == 1)
+        top_blob.create(outw, num_output, elemsize, opt.blob_allocator);
+    else
+        top_blob.create(outw, num_output, channels, elemsize, opt.blob_allocator);
     if (top_blob.empty())
         return -100;
 
@@ -164,7 +217,12 @@ int Convolution1D::forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat
 
     const int outw = (w - kernel_extent_w) / stride_w + 1;
 
-    top_blob.create(outw, _num_output, elemsize, opt.blob_allocator);
+    const int channels = bottom_blob_bordered.dims == 3 ? bottom_blob_bordered.c : 1;
+
+    if (channels == 1)
+        top_blob.create(outw, _num_output, elemsize, opt.blob_allocator);
+    else
+        top_blob.create(outw, _num_output, channels, elemsize, opt.blob_allocator);
     if (top_blob.empty())
         return -100;
 
