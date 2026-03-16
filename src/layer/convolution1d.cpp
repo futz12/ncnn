@@ -66,44 +66,86 @@ static int convolution1d(const Mat& bottom_blob, Mat& top_blob, const Mat& weigh
 
     const int bias_term = bias_data.empty() ? 0 : 1;
 
-    #pragma omp parallel for num_threads(opt.num_threads)
-    for (int i = 0; i < channels * outh; i++)
+    if (channels == 1)
     {
-        const int q = i / outh;
-        const int p = i % outh;
-        const Mat bottom_blob_q = channels == 1 ? bottom_blob : bottom_blob.channel(q);
-        Mat top_blob_q = channels == 1 ? top_blob : top_blob.channel(q);
-
-        float* outptr = top_blob_q.row(p);
-
-        for (int j = 0; j < outw; j++)
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int p = 0; p < outh; p++)
         {
-            float sum = 0.f;
+            float* outptr = top_blob.row(p);
 
-            if (bias_term)
-                sum = bias_data[p];
-
-            const float* kptr = (const float*)weight_data + kernel_w * h * p;
-
-            for (int r = 0; r < h; r++)
+            for (int j = 0; j < outw; j++)
             {
-                const float* sptr = bottom_blob_q.row(r) + j * stride_w;
+                float sum = 0.f;
 
-                for (int k = 0; k < kernel_w; k++)
+                if (bias_term)
+                    sum = bias_data[p];
+
+                const float* kptr = (const float*)weight_data + kernel_w * h * p;
+
+                for (int q = 0; q < h; q++)
                 {
-                    float val = *sptr;
-                    float wt = kptr[k];
-                    sum += val * wt;
+                    const float* sptr = bottom_blob.row(q) + j * stride_w;
 
-                    sptr += dilation_w;
+                    for (int k = 0; k < kernel_w; k++)
+                    {
+                        float val = *sptr;
+                        float wt = kptr[k];
+                        sum += val * wt;
+
+                        sptr += dilation_w;
+                    }
+
+                    kptr += kernel_w;
                 }
 
-                kptr += kernel_w;
+                sum = activation_ss(sum, activation_type, activation_params);
+
+                outptr[j] = sum;
             }
+        }
+    }
+    else
+    {
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
+        {
+            const Mat bottom_blob_q = bottom_blob.channel(q);
+            Mat top_blob_q = top_blob.channel(q);
 
-            sum = activation_ss(sum, activation_type, activation_params);
+            for (int p = 0; p < outh; p++)
+            {
+                float* outptr = top_blob_q.row(p);
 
-            outptr[j] = sum;
+                for (int j = 0; j < outw; j++)
+                {
+                    float sum = 0.f;
+
+                    if (bias_term)
+                        sum = bias_data[p];
+
+                    const float* kptr = (const float*)weight_data + kernel_w * h * p;
+
+                    for (int r = 0; r < h; r++)
+                    {
+                        const float* sptr = bottom_blob_q.row(r) + j * stride_w;
+
+                        for (int k = 0; k < kernel_w; k++)
+                        {
+                            float val = *sptr;
+                            float wt = kptr[k];
+                            sum += val * wt;
+
+                            sptr += dilation_w;
+                        }
+
+                        kptr += kernel_w;
+                    }
+
+                    sum = activation_ss(sum, activation_type, activation_params);
+
+                    outptr[j] = sum;
+                }
+            }
         }
     }
 
