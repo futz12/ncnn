@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Futz12 <pchar.cn>
+// Copyright 2026 Futz12 <pchar.cn>
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include "convolution3d_vulkan.h"
@@ -35,6 +35,14 @@ Convolution3D_vulkan::Convolution3D_vulkan()
     UNROLL_WG_M = 1;
     UNROLL_WG_N = 1;
 }
+
+// Windows TDR: the watchdog resets the GPU (nvlddmkm -> VK_ERROR_DEVICE_LOST)
+// when a single submission runs past the ~2s limit. Large conv3d layers of the
+// Wan2.2 VAE decoder are single multi-TFLOP dispatches, so above this FLOP
+// budget the dispatch is split into output-channel segments with
+// submit_and_wait between them. 0.2 TFLOP is roughly 50ms on an
+// RTX-4060-class GPU, far under the TDR limit.
+static const size_t convolution3d_gemm_tdr_flop_threshold = (size_t)200000000000;
 
 int Convolution3D_vulkan::load_param(const ParamDict& pd)
 {
@@ -1283,7 +1291,7 @@ int Convolution3D_vulkan::forward(const VkMat& bottom_blob, VkMat& top_blob, VkC
             bindings[2] = weight_data_gpu;
             bindings[3] = bias_data_gpu;
 
-            std::vector<vk_constant_type> constants(8);
+            std::vector<vk_constant_type> constants(9);
             constants[0].u32 = bottom_blob_bordered.w;
             constants[1].u32 = bottom_blob_bordered.h;
             constants[2].u32 = bottom_blob_bordered.d;
@@ -1292,16 +1300,52 @@ int Convolution3D_vulkan::forward(const VkMat& bottom_blob, VkMat& top_blob, VkC
             constants[5].u32 = top_blob.h;
             constants[6].u32 = top_blob.d;
             constants[7].u32 = top_blob.cstep;
+            // global block origin of the dispatch segment, nonzero only in the TDR split below
+            constants[8].u32 = 0;
 
             const int blocks_x = (top_blob.w * top_blob.h * top_blob.d + coopmat_M * UNROLL_SG_M * UNROLL_WG_M - 1) / (coopmat_M * UNROLL_SG_M * UNROLL_WG_M);
             const int blocks_y = (num_output + coopmat_N * UNROLL_SG_N * UNROLL_WG_N - 1) / (coopmat_N * UNROLL_SG_N * UNROLL_WG_N);
 
+            const int local_size_x = coopmat_subgroup_size * UNROLL_WG_M * UNROLL_WG_N;
+            const int total_blocks = blocks_x * blocks_y;
+
             VkMat dispatcher;
-            dispatcher.w = (blocks_x * blocks_y) * (coopmat_subgroup_size * UNROLL_WG_M * UNROLL_WG_N);
+            dispatcher.w = total_blocks * local_size_x;
             dispatcher.h = 1;
             dispatcher.c = 1;
 
-            cmd.record_pipeline(pipeline_convolution3d_gemm, bindings, constants, dispatcher);
+            // true work of the whole layer, same accounting as the packed path
+            const size_t total_flops = 2 * (size_t)num_output * top_blob.w * top_blob.h * top_blob.d * num_input * maxk;
+
+            if (total_flops <= convolution3d_gemm_tdr_flop_threshold)
+            {
+                cmd.record_pipeline(pipeline_convolution3d_gemm, bindings, constants, dispatcher);
+            }
+            else
+            {
+                // each block covers one MxN output tile over the full K extent
+                const size_t flops_per_block = 2 * (size_t)(coopmat_M * UNROLL_SG_M * UNROLL_WG_M) * (coopmat_N * UNROLL_SG_N * UNROLL_WG_N) * num_input * maxk;
+
+                // split the flattened block range so no single submission can
+                // outrun the Windows TDR watchdog (see threshold comment above)
+                const int step = std::max(1, (int)(convolution3d_gemm_tdr_flop_threshold / flops_per_block));
+                for (int base_block = 0; base_block < total_blocks; base_block += step)
+                {
+                    VkMat segment = dispatcher;
+                    segment.w = std::min(step, total_blocks - base_block) * local_size_x;
+
+                    constants[8].u32 = base_block;
+                    cmd.record_pipeline(pipeline_convolution3d_gemm, bindings, constants, segment);
+
+                    if (base_block + step < total_blocks)
+                    {
+                        int ret = cmd.submit_and_wait();
+                        cmd.reset();
+                        if (ret != 0)
+                            return ret;
+                    }
+                }
+            }
         }
         else
         {
@@ -1316,7 +1360,7 @@ int Convolution3D_vulkan::forward(const VkMat& bottom_blob, VkMat& top_blob, VkC
             bindings[4] = weight_data_gpu;
             bindings[5] = bias_data_gpu;
 
-            std::vector<vk_constant_type> constants(12);
+            std::vector<vk_constant_type> constants(13);
             constants[0].i = bottom_blob_bordered.w;
             constants[1].i = bottom_blob_bordered.h;
             constants[2].i = bottom_blob_bordered.d;
@@ -1329,13 +1373,45 @@ int Convolution3D_vulkan::forward(const VkMat& bottom_blob, VkMat& top_blob, VkC
             constants[9].i = top_blob.cstep;
             constants[10].i = num_output;
             constants[11].i = num_input;
+            // global Y origin of the dispatch segment, nonzero only in the TDR split below
+            constants[12].i = 0;
 
             VkMat dispatcher;
             dispatcher.w = (top_blob.w * top_blob.h * top_blob.d + 3) / 4;
             dispatcher.h = num_output_packed / 4;
             dispatcher.c = 1;
 
-            cmd.record_pipeline(pipeline_convolution3d_gemm, bindings, constants, dispatcher);
+            // each Y unit covers one pack4 group of output channels over the
+            // whole output volume
+            const size_t flops_per_y_unit = 2 * (size_t)4 * top_blob.w * top_blob.h * top_blob.d * num_input * maxk;
+            const size_t total_flops = flops_per_y_unit * (size_t)dispatcher.h;
+
+            if (total_flops <= convolution3d_gemm_tdr_flop_threshold)
+            {
+                cmd.record_pipeline(pipeline_convolution3d_gemm, bindings, constants, dispatcher);
+            }
+            else
+            {
+                // split dispatch Y so no single submission can outrun the
+                // Windows TDR watchdog (see threshold comment above)
+                const int step = std::max(1, (int)(convolution3d_gemm_tdr_flop_threshold / flops_per_y_unit));
+                for (int base_y = 0; base_y < dispatcher.h; base_y += step)
+                {
+                    VkMat segment = dispatcher;
+                    segment.h = std::min(step, dispatcher.h - base_y);
+
+                    constants[12].i = base_y;
+                    cmd.record_pipeline(pipeline_convolution3d_gemm, bindings, constants, segment);
+
+                    if (base_y + step < dispatcher.h)
+                    {
+                        int ret = cmd.submit_and_wait();
+                        cmd.reset();
+                        if (ret != 0)
+                            return ret;
+                    }
+                }
+            }
         }
 
         return 0;

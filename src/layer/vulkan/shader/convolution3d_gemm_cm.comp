@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Futz12 <pchar.cn>
+// Copyright 2026 Futz12 <pchar.cn>
 // SPDX-License-Identifier: BSD-3-Clause
 
 #version 450
@@ -71,6 +71,8 @@ layout(push_constant) uniform parameter
     uint outh;
     uint outd;
     uint outcstep;
+    // global workgroup (block) origin of this dispatch segment (0 when not split)
+    uint base_block;
 } p;
 
 shared uvec2 tmp_v[UNROLL_WG_M][UNROLL_SG_M * UNROLL_SG_K * M * K / 4];
@@ -107,7 +109,7 @@ void main()
     //    v  +------+------+------+------+
     //
 
-    const uint wgi = gl_WorkGroupID.x;
+    const uint wgi = p.base_block + gl_WorkGroupID.x;
     const uint sgi = gl_SubgroupID;
 
     const uint wgmm = (psc(outw) * psc(outh) * psc(outd) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);

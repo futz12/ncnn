@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Futz12 <pchar.cn>
+// Copyright 2026 Futz12 <pchar.cn>
 // SPDX-License-Identifier: BSD-3-Clause
 
 #version 450
@@ -64,6 +64,8 @@ layout(push_constant) uniform parameter
     int outcstep;
     int num_output;
     int num_input;
+    // global Y origin of this dispatch segment (0 when not split)
+    int base_y;
 } p;
 
 #if NCNN_shader_local_memory
@@ -74,7 +76,7 @@ shared lfpvec4 tmp_k[8][LOCAL_MEMORY_UNROLL_INCH][4];
 void main()
 {
     int gx = int(gl_GlobalInvocationID.x) * 4;
-    int gy = int(gl_GlobalInvocationID.y);
+    int gy = p.base_y + int(gl_GlobalInvocationID.y);
 
     const int outsize = psc(outw) * psc(outh) * psc(outd);
 
