@@ -35,7 +35,7 @@ layout(push_constant) uniform parameter
     int outdims;
     int outw;
     int outh;
-    int outd;
+    int base_y;
     int outc;
     int outcstep;
 
@@ -45,7 +45,7 @@ layout(push_constant) uniform parameter
 void main()
 {
     int gx = int(gl_GlobalInvocationID.x);
-    int gy = int(gl_GlobalInvocationID.y);
+    int gy = int(gl_GlobalInvocationID.y) + p.base_y;
     int gz = int(gl_GlobalInvocationID.z);
 
     if (gx >= psc(w) || gy >= psc(h) * psc(d) || gz >= psc(c))

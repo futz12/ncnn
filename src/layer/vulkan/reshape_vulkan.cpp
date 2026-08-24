@@ -332,6 +332,16 @@ int Reshape_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<
     }
 #endif // NCNN_BATCH
 
+    // pnnx graph cleanup can leave Reshape layers without any shape
+    // parameters (pure identity renames).  Treat ndim==0 with no shape
+    // expression as an alias instead of falling through with an empty top
+    // blob, which stalls the graph downstream.
+    if (ndim == 0 && shape_expr.empty())
+    {
+        top_blob = bottom_blob;
+        return 0;
+    }
+
     int total = bottom_blob.w * bottom_blob.h * bottom_blob.d * bottom_blob.c * elempack;
 
     // resolve out shape
@@ -472,7 +482,7 @@ int Reshape_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<
     bindings[0] = bottom_blob;
     bindings[1] = top_blob;
 
-    std::vector<vk_constant_type> constants(12);
+    std::vector<vk_constant_type> constants(13);
     constants[0].i = bottom_blob.dims;
     constants[1].i = bottom_blob.w;
     constants[2].i = bottom_blob.h;
@@ -485,22 +495,53 @@ int Reshape_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<
     constants[9].i = top_blob.d;
     constants[10].i = top_blob.c;
     constants[11].i = top_blob.cstep;
+    constants[12].i = 0;
 
+    const Pipeline* pipeline = 0;
     if (elempack == 1 && out_elempack == 1)
-    {
-        cmd.record_pipeline(pipeline_reshape, bindings, constants, top_blob);
-    }
+        pipeline = pipeline_reshape;
     else if (elempack == 4 && out_elempack == 4)
-    {
-        cmd.record_pipeline(pipeline_reshape_pack4, bindings, constants, top_blob);
-    }
+        pipeline = pipeline_reshape_pack4;
     else if (elempack == 1 && out_elempack == 4)
-    {
-        cmd.record_pipeline(pipeline_reshape_pack1to4, bindings, constants, top_blob);
-    }
+        pipeline = pipeline_reshape_pack1to4;
     else if (elempack == 4 && out_elempack == 1)
+        pipeline = pipeline_reshape_pack4to1;
+
+    if (!pipeline)
+        return -1;
+
+    // Vulkan limits the number of workgroups in one dispatch.  Reshape uses
+    // the flattened h*d extent as the Y dispatch dimension, which can exceed
+    // maxComputeWorkGroupCount[1] for long video token sequences.  Record
+    // several Y segments and add the segment origin in the shader.
+    const VkMat& dispatcher_blob = (elempack == 4 && out_elempack == 1) ? bottom_blob : top_blob;
+    const int dispatch_rows = dispatcher_blob.h * dispatcher_blob.d;
+    const uint32_t local_y = pipeline->local_size_y();
+    const uint32_t max_groups_y = vkdev->info.max_workgroup_count_y();
+    if (local_y == 0 || max_groups_y == 0)
+        return -1;
+
+    // Keep individual long dispatches comfortably below the device limit.
+    // A dispatch close to 65535 Y workgroups is legal, but on Windows/WDDM
+    // the total work in a reshape segment can still trip the GPU watchdog
+    // for the 832x480 / 121-frame sequence.  Smaller segments preserve the
+    // same global indexing while giving the driver more preemption points.
+    const uint32_t safe_max_groups_y = std::min(max_groups_y, 32768u);
+    const size_t max_dispatch_rows = (size_t)local_y * safe_max_groups_y;
+    if ((size_t)dispatch_rows <= max_dispatch_rows)
     {
-        cmd.record_pipeline(pipeline_reshape_pack4to1, bindings, constants, bottom_blob);
+        cmd.record_pipeline(pipeline, bindings, constants, dispatcher_blob);
+    }
+    else
+    {
+        for (int base_y = 0; base_y < dispatch_rows;)
+        {
+            const int segment_rows = (int)std::min(max_dispatch_rows, (size_t)(dispatch_rows - base_y));
+            constants[12].i = base_y;
+            Mat dispatcher(dispatcher_blob.w, segment_rows, 1, dispatcher_blob.c, (void*)0);
+            cmd.record_pipeline(pipeline, bindings, std::vector<VkImageMat>(), constants, dispatcher);
+            base_y += segment_rows;
+        }
     }
 
     return 0;

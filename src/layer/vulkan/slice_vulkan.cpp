@@ -87,13 +87,27 @@ int Slice_vulkan::create_pipeline(const Option& opt)
         local_size_xyz.h = 8;
         local_size_xyz.c = 1;
     }
-    if (shape_unpacked.dims == 3)
+    if (shape_unpacked.dims == 0)
     {
+        // unknown shape: use a tall local y so tall dispatches stay within maxComputeWorkGroupCount
         local_size_xyz.w = 4;
-        local_size_xyz.h = 4;
+        local_size_xyz.h = 64;
         local_size_xyz.c = 4;
     }
-
+    if (shape_unpacked.dims == 3)
+    {
+        // NVIDIA wraps y workgroup count at 65536; use a taller local y so count stays <= 65535
+        local_size_xyz.w = 4;
+        local_size_xyz.h = 64;
+        local_size_xyz.c = 4;
+    }
+    if (shape_unpacked.dims == 4)
+    {
+        // 4D flattens h*d into y; keep y workgroup count within maxComputeWorkGroupCount
+        local_size_xyz.w = 4;
+        local_size_xyz.h = 64;
+        local_size_xyz.c = 4;
+    }
     // pack1
     if (shape.dims == 0 || out_elempack == 1)
     {

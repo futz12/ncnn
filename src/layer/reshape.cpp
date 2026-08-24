@@ -93,6 +93,16 @@ int Reshape::forward(const std::vector<Mat>& bottom_blobs, std::vector<Mat>& top
         return forward_batch(bottom_blobs, top_blobs, opt);
 #endif
 
+    // pnnx graph cleanup can leave Reshape layers without any shape
+    // parameters (pure identity renames).  Treat ndim==0 with no shape
+    // expression as an alias instead of falling through with an empty top
+    // blob, which stalls the graph downstream.
+    if (ndim == 0 && shape_expr.empty())
+    {
+        top_blob = bottom_blob;
+        return 0;
+    }
+
     // resolve out shape
     int outw = w;
     int outh = h;

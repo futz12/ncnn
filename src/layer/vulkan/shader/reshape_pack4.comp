@@ -42,12 +42,14 @@ layout(push_constant) uniform parameter
     int outd;
     int outc;
     int outcstep;
+
+    int base_y;
 } p;
 
 void main()
 {
     int gx = int(gl_GlobalInvocationID.x);
-    int gy = int(gl_GlobalInvocationID.y);
+    int gy = int(gl_GlobalInvocationID.y) + p.base_y;
     int gz = int(gl_GlobalInvocationID.z);
 
     if (gx >= psc(outw) || gy >= psc(outh) * psc(outd) || gz >= psc(outc))

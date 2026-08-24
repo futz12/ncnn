@@ -7,6 +7,55 @@
 
 namespace ncnn {
 
+// Concat's Vulkan shaders flatten the h*d extent into dispatch Y. Long Wan
+// videos can exceed maxComputeWorkGroupCount[1] even when every tensor
+// dimension is valid. Split only the dispatch and pass the logical row
+// origin to the shader so the tensor layout remains unchanged.
+static void record_concat_pipeline(VkCompute& cmd, const Pipeline* pipeline,
+                                    const std::vector<VkMat>& bindings,
+                                    const std::vector<vk_constant_type>& constants,
+                                    const VkMat& dispatcher)
+{
+    if (!pipeline)
+        return;
+
+    std::vector<vk_constant_type> segment_constants = constants;
+    // Keep the reflected push-constant layout at 13 ints.  Slot 9 carries
+    // base_y; slot 6 must retain outdims because dynamic concat shapes use it
+    // through psc(outdims).
+    if (segment_constants.size() < 13)
+        segment_constants.resize(13);
+    segment_constants[9].i = 0;
+
+    const uint32_t local_y = pipeline->local_size_y();
+    const uint32_t max_groups_y = pipeline->vkdev->info.max_workgroup_count_y();
+    if (local_y == 0 || max_groups_y == 0)
+        return;
+
+    const size_t dispatch_rows = (size_t)dispatcher.h * (dispatcher.d ? dispatcher.d : 1);
+    // Keep each dispatch conservative.  Some Vulkan drivers produce incorrect
+    // results for the later segments when a 4D packed concat uses a very large
+    // Y dispatch, even though the advertised workgroup-count limit allows it.
+    // 8192 groups is still large enough to avoid the hardware limit and gives
+    // stable results for long Wan token sequences.
+    const uint32_t safe_max_groups_y = std::min(max_groups_y, 8192u);
+    const size_t max_segment_rows = (size_t)local_y * safe_max_groups_y;
+    if (dispatch_rows <= max_segment_rows)
+    {
+        cmd.record_pipeline(pipeline, bindings, segment_constants, dispatcher);
+        return;
+    }
+
+    for (size_t base_y = 0; base_y < dispatch_rows;)
+    {
+        const int segment_rows = (int)std::min(max_segment_rows, dispatch_rows - base_y);
+        segment_constants[9].i = (int)base_y;
+        Mat segment(dispatcher.w, segment_rows, 1, dispatcher.c, (void*)0);
+        cmd.record_pipeline(pipeline, bindings, std::vector<VkImageMat>(), segment_constants, segment);
+        base_y += (size_t)segment_rows;
+    }
+}
+
 Concat_vulkan::Concat_vulkan()
 {
     support_vulkan = true;
@@ -230,7 +279,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
                 pipeline = pipeline_concat_pack4to1[b % 2];
             }
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             woffset += bottom_blob.w * bottom_blob.elempack / elempack;
         }
@@ -315,7 +364,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
                 pipeline = pipeline_concat_pack4to1[b % 2];
             }
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             hoffset += bottom_blob.h * bottom_blob.elempack / elempack;
         }
@@ -375,7 +424,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
 
             const Pipeline* pipeline = elempack == 4 ? pipeline_concat_pack4[b % 2] : pipeline_concat[b % 2];
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             woffset += bottom_blob.w;
         }
@@ -455,7 +504,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
                 pipeline = pipeline_concat_pack4to1[b % 2];
             }
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             coffset += bottom_blob.c * bottom_blob.elempack / elempack;
         }
@@ -516,7 +565,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
 
             const Pipeline* pipeline = elempack == 4 ? pipeline_concat_pack4[b % 2] : pipeline_concat[b % 2];
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             hoffset += bottom_blob.h;
         }
@@ -571,7 +620,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
 
             const Pipeline* pipeline = elempack == 4 ? pipeline_concat_pack4[b % 2] : pipeline_concat[b % 2];
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             woffset += bottom_blob.w;
         }
@@ -651,7 +700,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
                 pipeline = pipeline_concat_pack4to1[b % 2];
             }
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             coffset += bottom_blob.c * bottom_blob.elempack / elempack;
         }
@@ -712,7 +761,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
 
             const Pipeline* pipeline = elempack == 4 ? pipeline_concat_pack4[b % 2] : pipeline_concat[b % 2];
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             doffset += bottom_blob.d;
         }
@@ -767,7 +816,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
 
             const Pipeline* pipeline = elempack == 4 ? pipeline_concat_pack4[b % 2] : pipeline_concat[b % 2];
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             hoffset += bottom_blob.h;
         }
@@ -822,7 +871,7 @@ int Concat_vulkan::forward(const std::vector<VkMat>& bottom_blobs, std::vector<V
 
             const Pipeline* pipeline = elempack == 4 ? pipeline_concat_pack4[b % 2] : pipeline_concat[b % 2];
 
-            cmd.record_pipeline(pipeline, bindings, constants, bottom_blob);
+            record_concat_pipeline(cmd, pipeline, bindings, constants, bottom_blob);
 
             woffset += bottom_blob.w;
         }
