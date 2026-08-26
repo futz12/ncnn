@@ -12,9 +12,9 @@ namespace ncnn {
 // dimension is valid. Split only the dispatch and pass the logical row
 // origin to the shader so the tensor layout remains unchanged.
 static void record_concat_pipeline(VkCompute& cmd, const Pipeline* pipeline,
-                                    const std::vector<VkMat>& bindings,
-                                    const std::vector<vk_constant_type>& constants,
-                                    const VkMat& dispatcher)
+                                   const std::vector<VkMat>& bindings,
+                                   const std::vector<vk_constant_type>& constants,
+                                   const VkMat& dispatcher)
 {
     if (!pipeline)
         return;
