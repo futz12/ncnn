@@ -5802,6 +5802,54 @@ static int gemm_BT_x86_wq_int8(const Mat& A, const Mat& BT, const Mat& BT_descal
     const int nn_N = (N + TILE_N - 1) / TILE_N;
     const int nn_K = (K + TILE_K - 1) / TILE_K;
     const int BT_hstep = BT.w;
+
+    if (M == 1 && !transA && !output_transpose && (broadcast_type_C == -1 || broadcast_type_C == 0 || broadcast_type_C == 4 || C.empty()))
+    {
+        signed char a_int8_buf[4096];
+        float a_descales_buf[256];
+        signed char* a_int8 = K <= 4096 ? a_int8_buf : (signed char*)malloc(K * sizeof(signed char));
+        float* a_descales = block_count <= 256 ? a_descales_buf : (float*)malloc(block_count * sizeof(float));
+
+        Mat AT_row(K, a_int8, (size_t)1u);
+        Mat AT_descales_row(block_count, a_descales, (size_t)4u);
+        quantize_A_tile_wq_int8(A, AT_row, AT_descales_row, 0, 1, 0, K, block_size, input_scales);
+
+        #pragma omp parallel for num_threads(nT) schedule(static)
+        for (int ppj = 0; ppj < nn_N; ppj++)
+        {
+            const int j = ppj * TILE_N;
+            const int max_jj = std::min(N - j, TILE_N);
+
+            float topT_tile_buf[1024];
+            float* p_topT = max_jj <= 1024 ? topT_tile_buf : (float*)malloc(max_jj * sizeof(float));
+            Mat topT_tile(max_jj, 1, p_topT, 4u);
+
+            Mat BT_tile(BT_hstep, max_jj, (signed char*)BT.data + (size_t)j * BT_hstep, (size_t)1u);
+            Mat BT_descales_tile(block_count * max_jj, (float*)BT_descales.data + (size_t)j * block_count, (size_t)4u);
+
+            for (int k = 0; k < K; k += TILE_K)
+            {
+                const int max_kk = std::min(K - k, TILE_K);
+                const int local_block_count = (max_kk + block_size - 1) / block_size;
+
+                Mat AT_tile(max_kk, 1, a_int8 + k, (size_t)1u);
+                Mat AT_descales_tile(local_block_count, 1, a_descales + (k / block_size), (size_t)4u);
+
+                gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, k, max_kk, K, block_size);
+            }
+
+            unpack_output_tile_wq_int8(topT_tile, C, top_blob, broadcast_type_C, 0, 1, j, max_jj, alpha, beta, output_elemtype, 0);
+
+            if (p_topT != topT_tile_buf)
+                free(p_topT);
+        }
+
+        if (a_int8 != a_int8_buf) free(a_int8);
+        if (a_descales != a_descales_buf) free(a_descales);
+
+        return 0;
+    }
+
     Mat topT(mr * nr, 1, nT, 4u, opt.workspace_allocator);
     if (topT.empty())
         return -100;

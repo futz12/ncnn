@@ -79,8 +79,7 @@ static void pack_B_tile_wq_int8(const Mat& B, const Mat& B_scales, Mat& BT_tile,
     int jj = 0;
 #if __SSE2__
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
     for (; jj + 7 < max_jj; jj += 8)
     {
         const signed char* p0 = B.row<const signed char>(j + jj);
@@ -129,13 +128,23 @@ static void pack_B_tile_wq_int8(const Mat& B, const Mat& B_scales, Mat& BT_tile,
 #endif // __AVX512VNNI__ || __AVXVNNI__
             for (; kk + 1 < max_kk; kk += 2)
             {
+#if __AVX512F__
                 _mm256_mask_cvtepi32_storeu_epi16(pp, (__mmask8)-1, _mm256_i32gather_epi32((const int*)p0, _vindex, sizeof(signed char)));
+#else
+                __m128i _p = _mm256_comp_cvtepi32_epi16(_mm256_i32gather_epi32((const int*)p0, _vindex, sizeof(signed char)));
+                _mm_storeu_si128((__m128i*)pp, _p);
+#endif // __AVX512F__
                 pp += 16;
                 p0 += 2;
             }
             for (; kk < max_kk; kk++)
             {
+#if __AVX512F__
                 _mm256_mask_cvtepi32_storeu_epi8(pp, (__mmask8)-1, _mm256_i32gather_epi32((const int*)p0, _vindex, sizeof(signed char)));
+#else
+                __m128i _p = _mm256_comp_cvtepi32_epi8(_mm256_i32gather_epi32((const int*)p0, _vindex, sizeof(signed char)));
+                _mm_storel_epi64((__m128i*)pp, _p);
+#endif // __AVX512F__
                 pp += 8;
                 p0++;
             }
@@ -146,8 +155,7 @@ static void pack_B_tile_wq_int8(const Mat& B, const Mat& B_scales, Mat& BT_tile,
             ps++;
         }
     }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
     for (; jj + 3 < max_jj; jj += 4)
     {
@@ -11836,7 +11844,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
 
         int jj = 0;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             const signed char* pB = pB_panel + (size_t)b_offset * 8;
@@ -11997,7 +12005,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
             pB_panel += (size_t)8 * B_hstep;
             pB_descales_panel += (size_t)8 * block_count;
         }
-#endif // __AVX512F__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -12341,8 +12349,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
 
         int jj = 0;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             const signed char* pB = pB_panel + (size_t)b_offset * 8;
@@ -12456,8 +12463,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
             pB_panel += (size_t)8 * B_hstep;
             pB_descales_panel += (size_t)8 * block_count;
         }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -12773,8 +12779,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
         int jj = 0;
 #if __SSE2__
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             const signed char* pB = pB_panel + (size_t)b_offset * 8;
@@ -12866,8 +12871,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
             pB_panel += (size_t)8 * B_hstep;
             pB_descales_panel += (size_t)8 * block_count;
         }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -13243,8 +13247,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
         int jj = 0;
 #if __SSE2__
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             const signed char* pB = pB_panel + (size_t)b_offset * 8;
@@ -13334,8 +13337,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
             pB_panel += (size_t)8 * B_hstep;
             pB_descales_panel += (size_t)8 * block_count;
         }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -13677,11 +13679,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #endif // __AVX512F__
 
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX512F__
+#if __AVX2__ || __AVX512F__
     TILE_N = std::max(8, tile_size / 8 * 8);
 #else
     TILE_N = std::max(4, tile_size / 4 * 4);
-#endif // __AVX512F__
+#endif // __AVX2__ || __AVX512F__
 #else
     TILE_N = std::max(2, tile_size / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -13708,11 +13710,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #endif // __AVX512F__
 
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX512F__
+#if __AVX2__ || __AVX512F__
             TILE_N = std::max(8, tile_size / 8 * 8);
 #else
             TILE_N = std::max(4, tile_size / 4 * 4);
-#endif // __AVX512F__
+#endif // __AVX2__ || __AVX512F__
 #else
             TILE_N = std::max(2, tile_size / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -13739,11 +13741,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     {
         int nn_N = (N + TILE_N - 1) / TILE_N;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX512F__
+#if __AVX2__ || __AVX512F__
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 7) / 8 * 8);
 #else
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 3) / 4 * 4);
-#endif // __AVX512F__
+#endif // __AVX2__ || __AVX512F__
 #else
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 1) / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -13760,6 +13762,17 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #else
         TILE_M = std::min(TILE_M, (std::max(1, TILE_M / nT) + 1) / 2 * 2);
 #endif // __AVX512F__
+
+        if (N > 0)
+        {
+#if __AVX2__ || __AVX512F__
+            TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 7) / 8 * 8);
+#elif __SSE2__
+            TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 3) / 4 * 4);
+#else
+            TILE_N = std::min(TILE_N, std::max(1, N / nT));
+#endif
+        }
     }
 
     // always take constant TILE_M/N/K value when provided
@@ -13779,11 +13792,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     if (constant_TILE_N > 0)
     {
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX512F__
+#if __AVX2__ || __AVX512F__
         TILE_N = (constant_TILE_N + 7) / 8 * 8;
 #else
         TILE_N = (constant_TILE_N + 3) / 4 * 4;
-#endif // __AVX512F__
+#endif // __AVX2__ || __AVX512F__
 #else
         TILE_N = (constant_TILE_N + 1) / 2 * 2;
 #endif // defined(__x86_64__) || defined(_M_X64)
