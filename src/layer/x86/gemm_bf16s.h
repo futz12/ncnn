@@ -12458,6 +12458,19 @@ static void get_optimal_tile_mnk_bf16(int M, int N, int K, int constant_TILE_M, 
 #else
         TILE_M = std::min(TILE_M, (std::max(1, TILE_M / nT) + 1) / 2 * 2);
 #endif
+
+        if (M <= 1 && N > 0)
+        {
+#if __AVX512F__
+            TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 15) / 16 * 16);
+#elif __AVX__
+            TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 7) / 8 * 8);
+#elif __SSE2__
+            TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 3) / 4 * 4);
+#else
+            TILE_N = std::min(TILE_N, std::max(1, N / nT));
+#endif
+        }
     }
 
     if (constant_TILE_M > 0)
