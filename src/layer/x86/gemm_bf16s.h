@@ -4346,8 +4346,6 @@ static void gemm_transB_packed_tile_bf16s(const Mat& AT_tile, const Mat& BT_tile
                 __m256 _va2 = _mm256_set1_ps(a_fp32[kk + 2]);
                 __m256 _va3 = _mm256_set1_ps(a_fp32[kk + 3]);
 
-
-
                 __m256 _vb00 = bfloat2float_avx(_mm_loadu_si128((const __m128i*)pB0));
                 __m256 _vb10 = bfloat2float_avx(_mm_loadu_si128((const __m128i*)pB1));
                 __m256 _vb20 = bfloat2float_avx(_mm_loadu_si128((const __m128i*)pB2));
