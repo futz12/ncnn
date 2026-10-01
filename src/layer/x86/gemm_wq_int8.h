@@ -8280,7 +8280,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
 
         int jj = 0;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             __m256 _f0 = _mm256_loadu_ps(pp + 0);
@@ -8684,7 +8684,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
             }
 #endif // NCNN_BF16
         }
-#endif // __AVX512F__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -9371,8 +9371,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
 
         int jj = 0;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             __m256 _t0 = _mm256_loadu_ps(pp);
@@ -9748,8 +9747,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
             }
 #endif // NCNN_BF16
         }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -10303,8 +10301,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
         int jj = 0;
 #if __SSE2__
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             __m256 _f0;
@@ -10483,8 +10480,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
             }
 #endif // NCNN_BF16
         }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -10951,8 +10947,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
         int jj = 0;
 #if __SSE2__
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX__
-#if __AVX512F__
+#if __AVX2__
         for (; jj + 7 < max_jj; jj += 8)
         {
             __m256 _f0 = _mm256_loadu_ps(pp);
@@ -11083,8 +11078,7 @@ static void unpack_output_tile_wq_int8(const Mat& topT, const Mat& C, Mat& top_b
             }
 #endif // NCNN_BF16
         }
-#endif // __AVX512F__
-#endif // __AVX__
+#endif // __AVX2__
 #endif // defined(__x86_64__) || defined(_M_X64)
         for (; jj + 3 < max_jj; jj += 4)
         {
@@ -14072,17 +14066,7 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
         TILE_M = std::min(TILE_M, (std::max(1, TILE_M / nT) + 1) / 2 * 2);
 #endif // __AVX512F__
 
-        if (M <= 1 && N > 0)
-        {
-#if __AVX2__ || __AVX512F__
-            TILE_N = std::min(TILE_N, std::max(32, (std::max(1, N / (nT * 2)) + 7) / 8 * 8));
-#elif __SSE2__
-            TILE_N = std::min(TILE_N, std::max(16, (std::max(1, N / (nT * 2)) + 3) / 4 * 4));
-#else
-            TILE_N = std::min(TILE_N, std::max(16, N / (nT * 2)));
-#endif
-        }
-        else if (N > 0)
+        if (N > 0)
         {
 #if __AVX2__ || __AVX512F__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 7) / 8 * 8);

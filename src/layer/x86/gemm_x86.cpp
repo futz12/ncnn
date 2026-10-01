@@ -2941,19 +2941,7 @@ static void get_optimal_tile_mnk(int M, int N, int K, int constant_TILE_M, int c
         TILE_M = std::min(TILE_M, (std::max(1, TILE_M / nT) + 1) / 2 * 2);
 #endif
 
-        if (M <= 1 && N > 0)
-        {
-#if __AVX512F__
-            TILE_N = std::min(TILE_N, std::max(64, (std::max(1, N / (nT * 2)) + 15) / 16 * 16));
-#elif __AVX__
-            TILE_N = std::min(TILE_N, std::max(32, (std::max(1, N / (nT * 2)) + 3) / 4 * 4));
-#elif __SSE2__
-            TILE_N = std::min(TILE_N, std::max(16, (std::max(1, N / (nT * 2)) + 3) / 4 * 4));
-#else
-            TILE_N = std::min(TILE_N, std::max(16, N / (nT * 2)));
-#endif
-        }
-        else if (N > 0)
+        if (N > 0)
         {
 #if __AVX512F__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 15) / 16 * 16);
@@ -5845,26 +5833,10 @@ static int gemm_BT_x86_wq_int8(const Mat& A, const Mat& BT, const Mat& BT_descal
             Mat BT_tile(BT_hstep, max_jj, (signed char*)BT.data + (size_t)j * BT_hstep, (size_t)1u);
             Mat BT_descales_tile(block_count * max_jj, (float*)BT_descales.data + (size_t)j * block_count, (size_t)4u);
 
-            if (K <= 4096)
-            {
-                Mat AT_tile(K, 1, a_int8, (size_t)1u);
-                Mat AT_descales_tile(block_count, 1, a_descales, (size_t)4u);
+            Mat AT_tile(K, 1, a_int8, (size_t)1u);
+            Mat AT_descales_tile(block_count, 1, a_descales, (size_t)4u);
 
-                gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, 0, K, K, block_size);
-            }
-            else
-            {
-                for (int k = 0; k < K; k += TILE_K)
-                {
-                    const int max_kk = std::min(K - k, TILE_K);
-                    const int local_block_count = (max_kk + block_size - 1) / block_size;
-
-                    Mat AT_tile(max_kk, 1, a_int8 + k, (size_t)1u);
-                    Mat AT_descales_tile(local_block_count, 1, a_descales + (k / block_size), (size_t)4u);
-
-                    gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, k, max_kk, K, block_size);
-                }
-            }
+            gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, 0, K, K, block_size);
 
             unpack_output_tile_wq_int8(topT_tile, C, top_blob, broadcast_type_C, 0, 1, j, max_jj, alpha, beta, output_elemtype, 0);
 
