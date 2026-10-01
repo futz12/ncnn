@@ -315,7 +315,10 @@ int NetPrivate::forward_layer(int layer_index, std::vector<Mat>& blob_mats, std:
                 continue;
 
             double duration_us = (end - start) * vkdev->info.timestamp_period() / 1000;
-            NCNN_LOGE("%-24s %-30s %8.2lfus    |", layers[i]->type.c_str(), layers[i]->name.c_str(), duration_us);
+            if (is_layer_benchmark_active())
+                record_layer_benchmark(layers[i]->type, layers[i]->name, duration_us / 1000.0);
+            if (is_verbose_layer_benchmark())
+                NCNN_LOGE("%-24s %-30s %8.2lfus    |", layers[i]->type.c_str(), layers[i]->name.c_str(), duration_us);
         }
 #endif // NCNN_BENCHMARK
 
@@ -3282,7 +3285,10 @@ int Extractor::extract(int blob_index, Mat& feat, int type)
                         continue;
 
                     double duration_us = (end - start) * d->net->vulkan_device()->info.timestamp_period() / 1000;
-                    NCNN_LOGE("%-24s %-30s %8.2lfus    |", d->net->layers()[i]->type.c_str(), d->net->layers()[i]->name.c_str(), duration_us);
+                    if (is_layer_benchmark_active())
+                        record_layer_benchmark(d->net->layers()[i]->type, d->net->layers()[i]->name, duration_us / 1000.0);
+                    if (is_verbose_layer_benchmark())
+                        NCNN_LOGE("%-24s %-30s %8.2lfus    |", d->net->layers()[i]->type.c_str(), d->net->layers()[i]->name.c_str(), duration_us);
                 }
 #endif // NCNN_BENCHMARK
             }
