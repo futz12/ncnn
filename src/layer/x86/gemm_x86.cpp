@@ -2941,7 +2941,7 @@ static void get_optimal_tile_mnk(int M, int N, int K, int constant_TILE_M, int c
         TILE_M = std::min(TILE_M, (std::max(1, TILE_M / nT) + 1) / 2 * 2);
 #endif
 
-        if (M <= 1 && N > 0)
+        if (N > 0)
         {
 #if __AVX512F__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 15) / 16 * 16);
@@ -5229,16 +5229,15 @@ static int gemm_BT_x86_bf16s(const Mat& A, const Mat& BT, const Mat& C, Mat& top
 
     if (M == 1 && !transA && !output_transpose && (broadcast_type_C == -1 || broadcast_type_C == 0 || broadcast_type_C == 4 || C.empty()))
     {
-        Mat a_bf16;
-        const unsigned short* a_ptr;
+        const void* a_ptr = 0;
+        size_t a_elemsize = A.elemsize;
         if (A.elemsize == 2)
         {
-            a_ptr = (const unsigned short*)A;
+            a_ptr = (const void*)(const unsigned short*)A;
         }
         else
         {
-            cast_float32_to_bfloat16(A, a_bf16, opt);
-            a_ptr = (const unsigned short*)a_bf16;
+            a_ptr = (const void*)(const float*)A;
         }
 
         #pragma omp parallel for num_threads(nT) schedule(static)
@@ -5256,7 +5255,7 @@ static int gemm_BT_x86_bf16s(const Mat& A, const Mat& BT, const Mat& C, Mat& top
                 const int k = ppk * TILE_K;
                 const int max_kk = std::min((K - k), TILE_K);
 
-                Mat AT_tile(max_kk, 1, (void*)(a_ptr + k), 2u);
+                Mat AT_tile(max_kk, 1, (void*)((const char*)a_ptr + (size_t)k * a_elemsize), a_elemsize);
                 Mat BT_tile = BT.channel(ppj).row_range(ppk, 1);
 
                 gemm_transB_packed_tile_bf16s(AT_tile, BT_tile, topT_tile, 0, 1, j, max_jj, k, max_kk);
