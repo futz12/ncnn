@@ -5826,11 +5826,17 @@ static int gemm_BT_x86_wq_int8(const Mat& A, const Mat& BT, const Mat& BT_descal
         Mat AT_descales_row(block_count, a_descales, (size_t)4u);
         quantize_A_tile_wq_int8(A, AT_row, AT_descales_row, 0, 1, 0, K, block_size, input_scales);
 
-        #pragma omp parallel for num_threads(nT) schedule(guided)
-        for (int ppj = 0; ppj < nn_N; ppj++)
+        const int min_tile = 32;
+        int m1_tile_n = (N + nT - 1) / nT;
+        m1_tile_n = std::max(min_tile, (m1_tile_n + 31) / 32 * 32);
+        m1_tile_n = std::min(1024, m1_tile_n);
+        const int m1_nn_N = (N + m1_tile_n - 1) / m1_tile_n;
+
+        #pragma omp parallel for num_threads(nT) schedule(static)
+        for (int ppj = 0; ppj < m1_nn_N; ppj++)
         {
-            const int j = ppj * TILE_N;
-            const int max_jj = std::min(N - j, TILE_N);
+            const int j = ppj * m1_tile_n;
+            const int max_jj = std::min(N - j, m1_tile_n);
 
             float topT_tile_buf[1024];
             float* p_topT = max_jj <= 1024 ? topT_tile_buf : (float*)malloc(max_jj * sizeof(float));
@@ -5839,15 +5845,25 @@ static int gemm_BT_x86_wq_int8(const Mat& A, const Mat& BT, const Mat& BT_descal
             Mat BT_tile(BT_hstep, max_jj, (signed char*)BT.data + (size_t)j * BT_hstep, (size_t)1u);
             Mat BT_descales_tile(block_count * max_jj, (float*)BT_descales.data + (size_t)j * block_count, (size_t)4u);
 
-            for (int k = 0; k < K; k += TILE_K)
+            if (K <= 4096)
             {
-                const int max_kk = std::min(K - k, TILE_K);
-                const int local_block_count = (max_kk + block_size - 1) / block_size;
+                Mat AT_tile(K, 1, a_int8, (size_t)1u);
+                Mat AT_descales_tile(block_count, 1, a_descales, (size_t)4u);
 
-                Mat AT_tile(max_kk, 1, a_int8 + k, (size_t)1u);
-                Mat AT_descales_tile(local_block_count, 1, a_descales + (k / block_size), (size_t)4u);
+                gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, 0, K, K, block_size);
+            }
+            else
+            {
+                for (int k = 0; k < K; k += TILE_K)
+                {
+                    const int max_kk = std::min(K - k, TILE_K);
+                    const int local_block_count = (max_kk + block_size - 1) / block_size;
 
-                gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, k, max_kk, K, block_size);
+                    Mat AT_tile(max_kk, 1, a_int8 + k, (size_t)1u);
+                    Mat AT_descales_tile(local_block_count, 1, a_descales + (k / block_size), (size_t)4u);
+
+                    gemm_transB_packed_tile_wq_int8(AT_tile, AT_descales_tile, BT_tile, BT_descales_tile, topT_tile, 1, max_jj, k, max_kk, K, block_size);
+                }
             }
 
             unpack_output_tile_wq_int8(topT_tile, C, top_blob, broadcast_type_C, 0, 1, j, max_jj, alpha, beta, output_elemtype, 0);
