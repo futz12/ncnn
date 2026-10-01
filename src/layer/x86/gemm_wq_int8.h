@@ -11895,7 +11895,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
                 __m256i _sum7 = _mm256_setzero_si256();
                 const int max_kk0 = std::min(max_kk - kk0, block_size);
                 int kk = 0;
-#if __AVX512VNNI__
+#if __AVX512VNNI__ || (__AVXVNNI__ && !__AVXVNNIINT8__)
                 for (; kk + 3 < max_kk0; kk += 4)
                 {
                     __m256i _pA0 = _mm256_loadu_si256((const __m256i*)pA);
@@ -12384,7 +12384,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
                 __m256i _sum3 = _mm256_setzero_si256();
                 const int max_kk0 = std::min(max_kk - kk0, block_size);
                 int kk = 0;
-#if __AVX512VNNI__
+#if __AVX512VNNI__ || (__AVXVNNI__ && !__AVXVNNIINT8__)
                 for (; kk + 3 < max_kk0; kk += 4)
                 {
                     __m256i _pA0 = _mm256_broadcastsi128_si256(_mm_loadu_si128((const __m128i*)pA));
@@ -12806,7 +12806,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
                 __m256i _sum1 = _mm256_setzero_si256();
                 const int max_kk0 = std::min(max_kk - kk0, block_size);
                 int kk = 0;
-#if __AVX512VNNI__
+#if __AVX512VNNI__ || (__AVXVNNI__ && !__AVXVNNIINT8__)
                 for (; kk + 3 < max_kk0; kk += 4)
                 {
                     __m128i _pA8 = _mm_loadl_epi64((const __m128i*)pA);
@@ -13269,7 +13269,7 @@ static void gemm_transB_packed_tile_wq_int8(const Mat& AT_tile, const Mat& AT_de
                 __m256i _sum = _mm256_setzero_si256();
                 const int max_kk0 = std::min(max_kk - kk0, block_size);
                 int kk = 0;
-#if __AVX512VNNI__
+#if __AVX512VNNI__ || (__AVXVNNI__ && !__AVXVNNIINT8__)
                 for (; kk + 3 < max_kk0; kk += 4)
                 {
                     __m128i _pA32 = _mm_castps_si128(_mm_load_ss((const float*)pA));
