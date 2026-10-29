@@ -14,6 +14,10 @@
 
 namespace ncnn {
 
+#if NCNN_BF16
+#include "pooling_bf16s.h"
+#endif
+
 Pooling_riscv::Pooling_riscv()
 {
 #if __riscv_vector
@@ -25,6 +29,9 @@ Pooling_riscv::Pooling_riscv()
 #else
     support_fp16_storage = cpu_support_riscv_zfh();
 #endif
+#endif
+#if NCNN_BF16
+    support_bf16_storage = true;
 #endif
 }
 
@@ -49,9 +56,11 @@ int Pooling_riscv::forward(const Mat& bottom_blob, Mat& top_blob, const Option& 
         return Pooling::forward(bottom_blob, top_blob, opt);
     }
 
-#if NCNN_ZFH
+#if NCNN_ZFH || NCNN_BF16
     int elembits = bottom_blob.elembits();
+#endif
 
+#if NCNN_ZFH
     if (opt.use_fp16_storage && elembits == 16)
     {
         if (opt.use_fp16_arithmetic)
@@ -59,6 +68,11 @@ int Pooling_riscv::forward(const Mat& bottom_blob, Mat& top_blob, const Option& 
         else
             return forward_fp16s(bottom_blob, top_blob, opt);
     }
+#endif
+
+#if NCNN_BF16
+    if (opt.use_bf16_storage && elembits == 16)
+        return forward_bf16s(bottom_blob, top_blob, opt);
 #endif
 
     // max value in NxN window
@@ -301,5 +315,12 @@ int Pooling_riscv::forward(const Mat& bottom_blob, Mat& top_blob, const Option& 
 
     return Pooling::forward(bottom_blob, top_blob, opt);
 }
+
+#if NCNN_BF16
+int Pooling_riscv::forward_bf16s(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
+{
+    return pooling_bf16s(bottom_blob, top_blob, opt, this);
+}
+#endif // NCNN_BF16
 
 } // namespace ncnn
