@@ -10,17 +10,29 @@
 
 namespace ncnn {
 
+#if NCNN_BF16
+#include "scale_bf16s.h"
+#endif
+
 Scale_riscv::Scale_riscv()
 {
 #if __riscv_vector
     support_packing = true;
 #endif // __riscv_vector
+#if NCNN_BF16
+    support_bf16_storage = true;
+#endif
 }
 
 int Scale_riscv::forward_inplace(std::vector<Mat>& bottom_top_blobs, const Option& opt) const
 {
     Mat& bottom_top_blob = bottom_top_blobs[0];
     const Mat& scale_blob = bottom_top_blobs[1];
+
+#if NCNN_BF16
+    if (opt.use_bf16_storage && bottom_top_blob.elembits() == 16)
+        return forward_inplace_bf16s(bottom_top_blobs, opt);
+#endif
 
     int dims = bottom_top_blob.dims;
     int elempack = bottom_top_blob.elempack;
@@ -343,5 +355,44 @@ int Scale_riscv::forward_inplace(std::vector<Mat>& bottom_top_blobs, const Optio
 
     return 0;
 }
+
+#if NCNN_BF16
+int Scale_riscv::forward_inplace_bf16s(std::vector<Mat>& bottom_top_blobs, const Option& opt) const
+{
+    Mat& bottom_top_blob = bottom_top_blobs[0];
+    const Mat& scale_blob = bottom_top_blobs[1];
+
+    // scale_blob may be bf16 (from the second input) or fp32 (from scale_data weight)
+    const float* scale = 0;
+    Mat scale_fp32;
+    if (scale_blob.elembits() == 16)
+    {
+        const int scale_data_size = scale_blob.w * scale_blob.elempack;
+        scale_fp32.create(scale_data_size, 4u, 1, opt.workspace_allocator);
+        if (scale_fp32.empty())
+            return -100;
+
+        const unsigned short* src = scale_blob;
+        float* dst = scale_fp32;
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < scale_data_size; i++)
+        {
+            dst[i] = bfloat16_to_float32(src[i]);
+        }
+
+        scale = scale_fp32;
+    }
+    else
+    {
+        scale = scale_blob;
+    }
+
+    const float* bias = bias_term ? (const float*)bias_data : 0;
+
+    scale_bf16s(bottom_top_blob, scale, bias, bias_term, opt);
+
+    return 0;
+}
+#endif // NCNN_BF16
 
 } // namespace ncnn
