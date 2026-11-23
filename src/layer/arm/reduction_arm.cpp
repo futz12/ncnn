@@ -18,6 +18,22 @@ namespace ncnn {
 
 int Reduction_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
+    // use the generic kernel until the remaining axis layouts have ARM kernels that are not slower
+    if (bottom_blob.dims == 1)
+        return Reduction::forward(bottom_blob, top_blob, opt);
+
+    if (bottom_blob.dims == 2 && !reduce_all && axes.w == 1)
+    {
+        const int axis = ((const int*)axes)[0];
+        if (operation == ReductionOp_SUM && (axis == 1 || axis == -1))
+            return Reduction::forward(bottom_blob, top_blob, opt);
+        if (operation == ReductionOp_LogSumExp && (axis == 0 || axis == -2))
+            return Reduction::forward(bottom_blob, top_blob, opt);
+    }
+
+    if (bottom_blob.dims == 4 && (operation == ReductionOp_SUMSQ || operation == ReductionOp_L2))
+        return Reduction::forward(bottom_blob, top_blob, opt);
+
     bool reduce_w, reduce_h, reduce_d, reduce_c;
     int outdims, outw, outh, outd, outc;
     resolve_reduce_flags_and_output_shape(bottom_blob, reduce_w, reduce_h, reduce_d, reduce_c, outdims, outw, outh, outd, outc);
@@ -35,6 +51,52 @@ int Reduction_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& 
 
     if (top_blob.empty())
         return -100;
+
+    if (operation == ReductionOp_MAX && outdims == 2 && bottom_blob.dims == 3 && reduce_c && !reduce_w && !reduce_h && (bottom_blob.w * bottom_blob.h) % 4 == 0)
+    {
+        const int w = bottom_blob.w;
+        const int h = bottom_blob.h;
+        const int channels = bottom_blob.c;
+        const int n = w * h;
+        float* outptr = top_blob;
+
+#if __ARM_NEON
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < n; i += 4)
+        {
+            float32x4_t _max = vdupq_n_f32(-FLT_MAX);
+            for (int q = 0; q < channels; q++)
+            {
+                const float* ptr = bottom_blob.channel(q);
+                _max = vmaxq_f32(_max, vld1q_f32(ptr + i));
+            }
+
+            if (i + 3 < n)
+            {
+                vst1q_f32(outptr + i, _max);
+            }
+            else
+            {
+                for (int j = 0; i + j < n; j++)
+                    outptr[i + j] = vgetq_lane_f32(_max, j);
+            }
+        }
+#else
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < n; i++)
+        {
+            float max_value = -FLT_MAX;
+            for (int q = 0; q < channels; q++)
+            {
+                const float* ptr = bottom_blob.channel(q);
+                max_value = ptr[i] > max_value ? ptr[i] : max_value;
+            }
+            outptr[i] = max_value;
+        }
+#endif // __ARM_NEON
+
+        return 0;
+    }
 
     int ret = reduction_fp32(bottom_blob, top_blob, reduce_w, reduce_h, reduce_d, reduce_c, operation, opt);
     if (ret != 0)
