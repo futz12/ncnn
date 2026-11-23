@@ -11,16 +11,6 @@ namespace reduction_arm_functor {
 #include <arm_neon.h>
 #include "neon_mathfun.h"
 
-static NCNN_FORCEINLINE float reduction_horizontal_sum_ps(float32x4_t v)
-{
-#if __aarch64__
-    return vaddvq_f32(v);
-#else
-    float32x2_t v2 = vadd_f32(vget_low_f32(v), vget_high_f32(v));
-    v2 = vpadd_f32(v2, v2);
-    return vget_lane_f32(v2, 0);
-#endif
-}
 #endif // __ARM_NEON
 
 template<typename Op, typename Op2>
@@ -383,7 +373,13 @@ static float reduction_sumexp(const float* ptr, int size, float max_value)
         _sum4 = vaddq_f32(_sum4, exp_ps(vsubq_f32(_p, _max4)));
         ptr += 4;
     }
-    sum = reduction_horizontal_sum_ps(_sum4);
+#if __aarch64__
+    sum = vaddvq_f32(_sum4);
+#else
+    float32x2_t _sum2 = vadd_f32(vget_low_f32(_sum4), vget_high_f32(_sum4));
+    _sum2 = vpadd_f32(_sum2, _sum2);
+    sum = vget_lane_f32(_sum2, 0);
+#endif
 #endif // __ARM_NEON
     for (; i < size; i++)
     {
