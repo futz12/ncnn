@@ -442,6 +442,31 @@ static int reduction_logsumexp(const Mat& a, Mat& b, bool reduce_w, bool reduce_
     int d = a.d;
     const int channels = a.c;
 
+    if (a.dims == 2 && !reduce_w && reduce_h && channels == 1)
+    {
+        float* outptr = (float*)b;
+        const float* ptr = (const float*)a;
+
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int j = 0; j < w; j++)
+        {
+            float max_value = -FLT_MAX;
+            for (int y = 0; y < h; y++)
+            {
+                const float v = ptr[y * w + j];
+                max_value = v > max_value ? v : max_value;
+            }
+
+            float sum = 0.f;
+            for (int y = 0; y < h; y++)
+            {
+                sum += expf(ptr[y * w + j] - max_value);
+            }
+            outptr[j] = max_value + logf(sum);
+        }
+        return 0;
+    }
+
     // the max is read back from b, the exp sums go to a buffer of the same shape
     Mat sums;
 
@@ -500,6 +525,33 @@ static int reduction_logsumexp(const Mat& a, Mat& b, bool reduce_w, bool reduce_
     const int reduced_h = reduce_h ? h : 1;
     const int reduced_d = reduce_d ? d : 1;
     const int reduced_c = reduce_c ? channels : 1;
+
+    if (!reduce_w && outc * outd * outh == 1 && outw >= 64)
+    {
+        const float* ptr = (const float*)a;
+        float* outptr = (float*)b;
+
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int j = 0; j < outw; j++)
+        {
+            const float max_value = outptr[j];
+            float sum = 0.f;
+            for (int qc = 0; qc < reduced_c; qc++)
+            {
+                for (int zd = 0; zd < reduced_d; zd++)
+                {
+                    const float* ptr0 = ptr + qc * a.cstep + zd * w * h;
+                    for (int yh = 0; yh < reduced_h; yh++)
+                    {
+                        sum += expf(ptr0[j] - max_value);
+                        ptr0 += w;
+                    }
+                }
+            }
+            outptr[j] = max_value + logf(sum);
+        }
+        return 0;
+    }
 
     if (!reduce_w)
     {
