@@ -19,18 +19,6 @@ namespace ncnn {
 int Reduction_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
     // use the generic kernel until the remaining axis layouts have ARM kernels that are not slower
-    if (bottom_blob.dims == 1)
-        return Reduction::forward(bottom_blob, top_blob, opt);
-
-    if (bottom_blob.dims == 2 && !reduce_all && axes.w == 1)
-    {
-        const int axis = ((const int*)axes)[0];
-        if (operation == ReductionOp_SUM && (axis == 1 || axis == -1))
-            return Reduction::forward(bottom_blob, top_blob, opt);
-        if (operation == ReductionOp_LogSumExp && (axis == 0 || axis == -2))
-            return Reduction::forward(bottom_blob, top_blob, opt);
-    }
-
     if (bottom_blob.dims == 4 && (operation == ReductionOp_SUMSQ || operation == ReductionOp_L2))
         return Reduction::forward(bottom_blob, top_blob, opt);
 

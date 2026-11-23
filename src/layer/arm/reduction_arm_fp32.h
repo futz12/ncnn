@@ -32,14 +32,27 @@ static NCNN_FORCEINLINE float reduction(float v0, const float* ptr, int size)
 
     int i = 0;
 #if __ARM_NEON
-    float32x4_t _sum4 = vdupq_n_f32(v0);
+    float32x4_t _sum0 = vdupq_n_f32(v0);
+    float32x4_t _sum1 = vdupq_n_f32(v0);
+    float32x4_t _sum2 = vdupq_n_f32(v0);
+    float32x4_t _sum3 = vdupq_n_f32(v0);
+    for (; i + 15 < size; i += 16)
+    {
+        _sum0 = op.func_pack4(_sum0, vld1q_f32(ptr));
+        _sum1 = op.func_pack4(_sum1, vld1q_f32(ptr + 4));
+        _sum2 = op.func_pack4(_sum2, vld1q_f32(ptr + 8));
+        _sum3 = op.func_pack4(_sum3, vld1q_f32(ptr + 12));
+        ptr += 16;
+    }
     for (; i + 3 < size; i += 4)
     {
-        float32x4_t _p = vld1q_f32(ptr);
-        _sum4 = op.func_pack4(_sum4, _p);
+        _sum0 = op.func_pack4(_sum0, vld1q_f32(ptr));
         ptr += 4;
     }
-    sum = op2.func(sum, op2.reduce_pack4(_sum4));
+    sum = op2.func(sum, op2.reduce_pack4(_sum0));
+    sum = op2.func(sum, op2.reduce_pack4(_sum1));
+    sum = op2.func(sum, op2.reduce_pack4(_sum2));
+    sum = op2.func(sum, op2.reduce_pack4(_sum3));
 #endif // __ARM_NEON
     for (; i < size; i++)
     {
@@ -432,11 +445,6 @@ static int reduction_logsumexp(const Mat& a, Mat& b, bool reduce_w, bool reduce_
 {
     using namespace reduction_arm_functor;
 
-    // subtracting the max keeps every exp argument non-positive
-    int ret = reduction_op<reduction_op_max, reduction_op_max>(a, b, reduce_w, reduce_h, reduce_d, reduce_c, -FLT_MAX, opt);
-    if (ret != 0)
-        return ret;
-
     int w = a.w;
     int h = a.h;
     int d = a.d;
@@ -447,6 +455,42 @@ static int reduction_logsumexp(const Mat& a, Mat& b, bool reduce_w, bool reduce_
         float* outptr = (float*)b;
         const float* ptr = (const float*)a;
 
+#if __ARM_NEON
+        const int w4 = w / 4 * 4;
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int j = 0; j < w4; j += 4)
+        {
+            float32x4_t _max = vdupq_n_f32(-FLT_MAX);
+            for (int y = 0; y < h; y++)
+            {
+                _max = vmaxq_f32(_max, vld1q_f32(ptr + y * w + j));
+            }
+
+            float32x4_t _sum = vdupq_n_f32(0.f);
+            for (int y = 0; y < h; y++)
+            {
+                _sum = vaddq_f32(_sum, exp_ps(vsubq_f32(vld1q_f32(ptr + y * w + j), _max)));
+            }
+
+            vst1q_f32(outptr + j, vaddq_f32(_max, log_ps(_sum)));
+        }
+        for (int j = w4; j < w; j++)
+        {
+            float max_value = -FLT_MAX;
+            for (int y = 0; y < h; y++)
+            {
+                const float v = ptr[y * w + j];
+                max_value = v > max_value ? v : max_value;
+            }
+
+            float sum = 0.f;
+            for (int y = 0; y < h; y++)
+            {
+                sum += expf(ptr[y * w + j] - max_value);
+            }
+            outptr[j] = max_value + logf(sum);
+        }
+#else
         #pragma omp parallel for num_threads(opt.num_threads)
         for (int j = 0; j < w; j++)
         {
@@ -464,8 +508,14 @@ static int reduction_logsumexp(const Mat& a, Mat& b, bool reduce_w, bool reduce_
             }
             outptr[j] = max_value + logf(sum);
         }
+#endif // __ARM_NEON
         return 0;
     }
+
+    // subtracting the max keeps every exp argument non-positive
+    int ret = reduction_op<reduction_op_max, reduction_op_max>(a, b, reduce_w, reduce_h, reduce_d, reduce_c, -FLT_MAX, opt);
+    if (ret != 0)
+        return ret;
 
     // the max is read back from b, the exp sums go to a buffer of the same shape
     Mat sums;
