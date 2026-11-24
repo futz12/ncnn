@@ -18,10 +18,6 @@ namespace ncnn {
 
 int Reduction_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& opt) const
 {
-    // use the generic kernel until the remaining axis layouts have ARM kernels that are not slower
-    if (bottom_blob.dims == 4 && (operation == ReductionOp_SUMSQ || operation == ReductionOp_L2))
-        return Reduction::forward(bottom_blob, top_blob, opt);
-
     bool reduce_w, reduce_h, reduce_d, reduce_c;
     int outdims, outw, outh, outd, outc;
     resolve_reduce_flags_and_output_shape(bottom_blob, reduce_w, reduce_h, reduce_d, reduce_c, outdims, outw, outh, outd, outc);
@@ -101,78 +97,58 @@ int Reduction_arm::forward(const Mat& bottom_blob, Mat& top_blob, const Option& 
         coeff /= scale;
     }
 
-    const int size = top_blob.w * top_blob.h * top_blob.d;
+    const int size = (int)top_blob.total();
+    const int size4 = size / 4 * 4;
+    float* outptr = top_blob;
     if (operation == ReductionOp_LogSum)
     {
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int q = 0; q < top_blob.c; q++)
-        {
-            float* ptr = top_blob.channel(q);
-            int i = 0;
 #if __ARM_NEON
-            for (; i + 3 < size; i += 4)
-            {
-                float32x4_t _p = vld1q_f32(ptr);
-                vst1q_f32(ptr, log_ps(_p));
-                ptr += 4;
-            }
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < size4; i += 4)
+        {
+            float32x4_t _p = vld1q_f32(outptr + i);
+            vst1q_f32(outptr + i, log_ps(_p));
+        }
 #endif // __ARM_NEON
-            for (; i < size; i++)
-            {
-                ptr[0] = logf(ptr[0]);
-                ptr++;
-            }
+        for (int i = size4; i < size; i++)
+        {
+            outptr[i] = logf(outptr[i]);
         }
     }
 
     if (operation == ReductionOp_L2)
     {
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int q = 0; q < top_blob.c; q++)
-        {
-            float* ptr = top_blob.channel(q);
-            int i = 0;
 #if __ARM_NEON
-            const float32x4_t _zero = vdupq_n_f32(0.f);
-            const float32x4_t _min = vdupq_n_f32(FLT_MIN);
-            for (; i + 3 < size; i += 4)
-            {
-                float32x4_t _p = vld1q_f32(ptr);
-                _p = vbslq_f32(vcgtq_f32(_p, _min), vsqrtq_f32(_p), _zero);
-                vst1q_f32(ptr, _p);
-                ptr += 4;
-            }
+        const float32x4_t _zero = vdupq_n_f32(0.f);
+        const float32x4_t _min = vdupq_n_f32(FLT_MIN);
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < size4; i += 4)
+        {
+            float32x4_t _p = vld1q_f32(outptr + i);
+            _p = vbslq_f32(vcgtq_f32(_p, _min), vsqrtq_f32(_p), _zero);
+            vst1q_f32(outptr + i, _p);
+        }
 #endif // __ARM_NEON
-            for (; i < size; i++)
-            {
-                ptr[0] = sqrtf(ptr[0] < FLT_MIN ? 0.f : ptr[0]);
-                ptr++;
-            }
+        for (int i = size4; i < size; i++)
+        {
+            outptr[i] = sqrtf(outptr[i] < FLT_MIN ? 0.f : outptr[i]);
         }
     }
 
     if (coeff != 1.f)
     {
-        #pragma omp parallel for num_threads(opt.num_threads)
-        for (int q = 0; q < top_blob.c; q++)
-        {
-            float* ptr = top_blob.channel(q);
-            int i = 0;
 #if __ARM_NEON
-            const float32x4_t _coeff = vdupq_n_f32(coeff);
-            for (; i + 3 < size; i += 4)
-            {
-                float32x4_t _p = vld1q_f32(ptr);
-                _p = vmulq_f32(_p, _coeff);
-                vst1q_f32(ptr, _p);
-                ptr += 4;
-            }
+        const float32x4_t _coeff = vdupq_n_f32(coeff);
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int i = 0; i < size4; i += 4)
+        {
+            float32x4_t _p = vld1q_f32(outptr + i);
+            vst1q_f32(outptr + i, vmulq_f32(_p, _coeff));
+        }
 #endif // __ARM_NEON
-            for (; i < size; i++)
-            {
-                ptr[0] *= coeff;
-                ptr++;
-            }
+        for (int i = size4; i < size; i++)
+        {
+            outptr[i] *= coeff;
         }
     }
 

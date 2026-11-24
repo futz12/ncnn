@@ -39,10 +39,10 @@ static NCNN_FORCEINLINE float reduction(float v0, const float* ptr, int size)
         _sum0 = op.func_pack4(_sum0, vld1q_f32(ptr));
         ptr += 4;
     }
+    _sum0 = op2.func_pack4(_sum0, _sum1);
+    _sum2 = op2.func_pack4(_sum2, _sum3);
+    _sum0 = op2.func_pack4(_sum0, _sum2);
     sum = op2.func(sum, op2.reduce_pack4(_sum0));
-    sum = op2.func(sum, op2.reduce_pack4(_sum1));
-    sum = op2.func(sum, op2.reduce_pack4(_sum2));
-    sum = op2.func(sum, op2.reduce_pack4(_sum3));
 #endif // __ARM_NEON
     for (; i < size; i++)
     {
@@ -170,6 +170,76 @@ static int reduction_op(const Mat& a, Mat& b, bool reduce_w, bool reduce_h, bool
             float* outptr = (float*)b + q * out_cstep;
             outptr[y] = reduction<Op, Op2>(v0, ptr, w);
         }
+        return 0;
+    }
+
+    // reduce each channel along w first, then combine the channel partials
+    if (a.dims == 4 && reduce_w && !reduce_h && !reduce_d && reduce_c)
+    {
+        Mat sums(channels, h, a.elemsize, opt.workspace_allocator);
+        if (sums.empty())
+            return -100;
+
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int q = 0; q < channels; q++)
+        {
+            const float* ptr = a.channel(q);
+            float* sumptr = (float*)sums + q;
+
+            for (int y = 0; y < h; y++)
+            {
+                float sum = v0;
+                const float* ptr0 = ptr + y * w;
+
+                int i = 0;
+#if __ARM_NEON
+                float32x4_t _sum0 = vdupq_n_f32(v0);
+                float32x4_t _sum1 = vdupq_n_f32(v0);
+                float32x4_t _sum2 = vdupq_n_f32(v0);
+                float32x4_t _sum3 = vdupq_n_f32(v0);
+                for (; i + 15 < w; i += 16)
+                {
+                    for (int z = 0; z < d; z++)
+                    {
+                        const float* p = ptr0 + (size_t)z * w * h + i;
+                        _sum0 = op.func_pack4(_sum0, vld1q_f32(p));
+                        _sum1 = op.func_pack4(_sum1, vld1q_f32(p + 4));
+                        _sum2 = op.func_pack4(_sum2, vld1q_f32(p + 8));
+                        _sum3 = op.func_pack4(_sum3, vld1q_f32(p + 12));
+                    }
+                }
+                _sum0 = op2.func_pack4(_sum0, _sum1);
+                _sum2 = op2.func_pack4(_sum2, _sum3);
+                _sum0 = op2.func_pack4(_sum0, _sum2);
+                sum = op2.func(sum, op2.reduce_pack4(_sum0));
+                for (; i + 3 < w; i += 4)
+                {
+                    float32x4_t _sum = vdupq_n_f32(v0);
+                    for (int z = 0; z < d; z++)
+                    {
+                        _sum = op.func_pack4(_sum, vld1q_f32(ptr0 + (size_t)z * w * h + i));
+                    }
+                    sum = op2.func(sum, op2.reduce_pack4(_sum));
+                }
+#endif // __ARM_NEON
+                for (; i < w; i++)
+                {
+                    for (int z = 0; z < d; z++)
+                    {
+                        sum = op.func(sum, ptr0[(size_t)z * w * h + i]);
+                    }
+                }
+
+                sumptr[y * channels] = sum;
+            }
+        }
+
+        #pragma omp parallel for num_threads(opt.num_threads)
+        for (int y = 0; y < h; y++)
+        {
+            b[y] = reduction<Op2, Op2>(v0, (const float*)sums + y * channels, channels);
+        }
+
         return 0;
     }
 
