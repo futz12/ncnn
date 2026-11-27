@@ -13969,6 +13969,10 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     if (nT == 0)
         nT = get_physical_big_cpu_count();
 
+    // The AVX build of this layer runs the AVX2 / AVX-VNNI wq_int8 kernels through runtime dispatch,
+    // and those pack B in 8-column panels. Keep TILE_N a multiple of 8 whenever __AVX__ is set,
+    // so the panels line up between create_pipeline, forward (TILE_N rounded up to out_elempack)
+    // and the M=1 path (32-column chunks).
     int tile_size = (int)sqrtf((float)l2_cache_size / (2 * sizeof(signed char) + sizeof(float)));
 
 #if __AVX512F__
@@ -13982,11 +13986,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #endif // __AVX512F__
 
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
     TILE_N = std::max(8, tile_size / 8 * 8);
 #else
     TILE_N = std::max(4, tile_size / 4 * 4);
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
     TILE_N = std::max(2, tile_size / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -14013,11 +14017,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #endif // __AVX512F__
 
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
             TILE_N = std::max(8, tile_size / 8 * 8);
 #else
             TILE_N = std::max(4, tile_size / 4 * 4);
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
             TILE_N = std::max(2, tile_size / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -14044,11 +14048,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     {
         int nn_N = (N + TILE_N - 1) / TILE_N;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 7) / 8 * 8);
 #else
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 3) / 4 * 4);
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 1) / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -14068,7 +14072,7 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 
         if (N > 0)
         {
-#if __AVX2__ || __AVX512F__
+#if __AVX__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 7) / 8 * 8);
 #elif __SSE2__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 3) / 4 * 4);
@@ -14095,11 +14099,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     if (constant_TILE_N > 0)
     {
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
         TILE_N = (constant_TILE_N + 7) / 8 * 8;
 #else
         TILE_N = (constant_TILE_N + 3) / 4 * 4;
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
         TILE_N = (constant_TILE_N + 1) / 2 * 2;
 #endif // defined(__x86_64__) || defined(_M_X64)
