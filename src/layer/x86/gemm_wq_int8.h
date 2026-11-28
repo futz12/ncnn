@@ -13982,11 +13982,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #endif // __AVX512F__
 
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
     TILE_N = std::max(8, tile_size / 8 * 8);
 #else
     TILE_N = std::max(4, tile_size / 4 * 4);
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
     TILE_N = std::max(2, tile_size / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -14013,11 +14013,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 #endif // __AVX512F__
 
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
             TILE_N = std::max(8, tile_size / 8 * 8);
 #else
             TILE_N = std::max(4, tile_size / 4 * 4);
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
             TILE_N = std::max(2, tile_size / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -14044,11 +14044,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     {
         int nn_N = (N + TILE_N - 1) / TILE_N;
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 7) / 8 * 8);
 #else
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 3) / 4 * 4);
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
         TILE_N = std::min(TILE_N, ((N + nn_N - 1) / nn_N + 1) / 2 * 2);
 #endif // defined(__x86_64__) || defined(_M_X64)
@@ -14068,7 +14068,7 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
 
         if (N > 0)
         {
-#if __AVX2__ || __AVX512F__
+#if __AVX__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 7) / 8 * 8);
 #elif __SSE2__
             TILE_N = std::min(TILE_N, (std::max(1, N / nT) + 3) / 4 * 4);
@@ -14095,11 +14095,11 @@ static void get_optimal_tile_mnk_wq_int8(int M, int N, int K, int block_size, in
     if (constant_TILE_N > 0)
     {
 #if defined(__x86_64__) || defined(_M_X64)
-#if __AVX2__ || __AVX512F__
+#if __AVX__
         TILE_N = (constant_TILE_N + 7) / 8 * 8;
 #else
         TILE_N = (constant_TILE_N + 3) / 4 * 4;
-#endif // __AVX2__ || __AVX512F__
+#endif // __AVX__
 #else
         TILE_N = (constant_TILE_N + 1) / 2 * 2;
 #endif // defined(__x86_64__) || defined(_M_X64)
